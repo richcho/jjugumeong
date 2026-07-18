@@ -84,20 +84,20 @@ func _build_interface() -> void:
 	add_child(top_panel)
 
 	var top_margin: MarginContainer = MarginContainer.new()
-	top_margin.add_theme_constant_override("margin_left", 18)
-	top_margin.add_theme_constant_override("margin_right", 18)
-	top_margin.add_theme_constant_override("margin_top", 10)
-	top_margin.add_theme_constant_override("margin_bottom", 10)
+	top_margin.add_theme_constant_override("margin_left", 15)
+	top_margin.add_theme_constant_override("margin_right", 15)
+	top_margin.add_theme_constant_override("margin_top", 7)
+	top_margin.add_theme_constant_override("margin_bottom", 7)
 	top_panel.add_child(top_margin)
 
 	var top_vbox: VBoxContainer = VBoxContainer.new()
-	top_vbox.add_theme_constant_override("separation", 5)
+	top_vbox.add_theme_constant_override("separation", 3)
 	top_margin.add_child(top_vbox)
 
 	var title_row: HBoxContainer = HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 14)
 	top_vbox.add_child(title_row)
-	title_label = _make_label("쥐구멍  r4 0.2.4", 25, Color("#ffd969"))
+	title_label = _make_label("쥐구멍  r4 0.2.5", 22, Color("#ffd969"))
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title_label)
 	save_label = _make_label("불러오는 중...", 14, Color("#afc9bd"))
@@ -124,17 +124,17 @@ func _build_interface() -> void:
 	event_grid.add_theme_constant_override("h_separation", 14)
 	event_grid.add_theme_constant_override("v_separation", 3)
 	top_vbox.add_child(event_grid)
-	golden_label = _make_label("", 14, Color("#ffe384"))
+	golden_label = _make_label("", 13, Color("#ffe384"))
 	golden_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	golden_label.clip_text = true
 	golden_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	event_grid.add_child(golden_label)
-	boost_label = _make_label("이동 구역 클릭: 속도 부스트", 14, Color("#9edbff"))
+	boost_label = _make_label("이동 구역 클릭: 속도 부스트", 13, Color("#9edbff"))
 	boost_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	boost_label.clip_text = true
 	boost_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	event_grid.add_child(boost_label)
-	next_stage_label = _make_label("", 14, Color("#d6c8e8"))
+	next_stage_label = _make_label("", 13, Color("#d6c8e8"))
 	next_stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	next_stage_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	next_stage_label.clip_text = true
@@ -146,18 +146,18 @@ func _build_interface() -> void:
 	bottom_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.06, 0.045, 0.075, 0.96), 12))
 	add_child(bottom_panel)
 	var bottom_margin: MarginContainer = MarginContainer.new()
-	bottom_margin.add_theme_constant_override("margin_left", 12)
-	bottom_margin.add_theme_constant_override("margin_right", 12)
-	bottom_margin.add_theme_constant_override("margin_top", 12)
-	bottom_margin.add_theme_constant_override("margin_bottom", 12)
+	bottom_margin.add_theme_constant_override("margin_left", 9)
+	bottom_margin.add_theme_constant_override("margin_right", 9)
+	bottom_margin.add_theme_constant_override("margin_top", 8)
+	bottom_margin.add_theme_constant_override("margin_bottom", 8)
 	bottom_panel.add_child(bottom_margin)
 	var bottom_content: VBoxContainer = VBoxContainer.new()
-	bottom_content.add_theme_constant_override("separation", 8)
+	bottom_content.add_theme_constant_override("separation", 6)
 	bottom_margin.add_child(bottom_content)
 	button_grid = GridContainer.new()
 	button_grid.columns = 4
-	button_grid.add_theme_constant_override("h_separation", 9)
-	button_grid.add_theme_constant_override("v_separation", 9)
+	button_grid.add_theme_constant_override("h_separation", 7)
+	button_grid.add_theme_constant_override("v_separation", 7)
 	bottom_content.add_child(button_grid)
 
 	speed_button = _make_button("", _on_speed_pressed, Color("#5d486f"))
@@ -169,7 +169,7 @@ func _build_interface() -> void:
 	button_grid.add_child(mouse_button)
 	button_grid.add_child(hole_button)
 	var utility_row: HBoxContainer = HBoxContainer.new()
-	utility_row.add_theme_constant_override("separation", 9)
+	utility_row.add_theme_constant_override("separation", 7)
 	bottom_content.add_child(utility_row)
 	utility_row.add_child(_make_utility_button("통계", _show_stats))
 	utility_row.add_child(_make_utility_button("지금 저장", _save_manually))
@@ -198,20 +198,20 @@ func _build_next_reward_panel() -> void:
 		_make_panel_style(Color(0.055, 0.045, 0.07, 0.9), 14)
 	)
 	add_child(next_reward_panel)
-	var margin: MarginContainer = _make_margin(14)
+	var margin: MarginContainer = _make_margin(10)
 	next_reward_panel.add_child(margin)
 	var content: VBoxContainer = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 4)
 	margin.add_child(content)
-	next_reward_title = _make_label("", 18, Color("#ffe384"))
+	next_reward_title = _make_label("", 16, Color("#ffe384"))
 	next_reward_title.clip_text = true
 	content.add_child(next_reward_title)
-	next_reward_detail = _make_label("", 14, Color("#eee7f0"))
+	next_reward_detail = _make_label("", 13, Color("#eee7f0"))
 	next_reward_detail.clip_text = true
 	content.add_child(next_reward_detail)
 	next_reward_progress = ProgressBar.new()
 	next_reward_progress.show_percentage = false
-	next_reward_progress.custom_minimum_size = Vector2(0.0, 12.0)
+	next_reward_progress.custom_minimum_size = Vector2(0.0, 8.0)
 	next_reward_progress.add_theme_stylebox_override(
 		"background",
 		_make_panel_style(Color(0.13, 0.12, 0.16, 0.95), 6)
@@ -327,14 +327,24 @@ func _refresh_all() -> void:
 		GameManager.mouse_count,
 		visible_groups
 	]
-	speed_button.text = "속도 강화 Lv.%d\n치즈 %d" % [GameManager.speed_level, GameManager.get_speed_upgrade_cost()]
-	carry_button.text = "운반량 %d → %d\n치즈 %d" % [
+	speed_button.text = "속도 Lv.%d  ·  치즈 %s" % [
+		GameManager.speed_level,
+		_format_number(float(GameManager.get_speed_upgrade_cost()))
+	]
+	carry_button.text = "운반 %d → %d  ·  치즈 %s" % [
 		GameManager.get_carry_capacity(),
 		GameManager.get_carry_capacity() + 1,
-		GameManager.get_carry_upgrade_cost()
+		_format_number(float(GameManager.get_carry_upgrade_cost()))
 	]
-	mouse_button.text = "쥐 추가 (%d마리)\n치즈 %d" % [GameManager.mouse_count, GameManager.get_mouse_cost()]
-	hole_button.text = "쥐구멍 확장 Lv.%d\n치즈 %d" % [GameManager.hole_level, GameManager.get_hole_upgrade_cost()]
+	mouse_button.text = "동료 %d → %d  ·  치즈 %s" % [
+		GameManager.mouse_count,
+		GameManager.mouse_count + 1,
+		_format_number(float(GameManager.get_mouse_cost()))
+	]
+	hole_button.text = "구멍 Lv.%d  ·  치즈 %s" % [
+		GameManager.hole_level,
+		_format_number(float(GameManager.get_hole_upgrade_cost()))
+	]
 	speed_button.disabled = GameManager.cheese < float(GameManager.get_speed_upgrade_cost())
 	carry_button.disabled = GameManager.cheese < float(GameManager.get_carry_upgrade_cost())
 	mouse_button.disabled = GameManager.cheese < float(GameManager.get_mouse_cost())
@@ -402,7 +412,7 @@ func _update_responsive_layout() -> void:
 	top_panel.offset_left = side_margin
 	top_panel.offset_top = 18.0
 	top_panel.offset_right = -side_margin
-	top_panel.offset_bottom = 137.0 if not compact_layout else 218.0
+	top_panel.offset_bottom = 122.0 if not compact_layout else 205.0
 	info_grid.columns = 4 if not compact_layout else 2
 	event_grid.columns = 3 if not compact_layout else 1
 	for event_label: Label in [golden_label, boost_label, next_stage_label]:
@@ -414,17 +424,17 @@ func _update_responsive_layout() -> void:
 	bottom_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom_panel.offset_left = side_margin
 	bottom_panel.offset_right = -side_margin
-	bottom_panel.offset_top = -158.0 if not compact_layout else -228.0
+	bottom_panel.offset_top = -118.0 if not compact_layout else -198.0
 	bottom_panel.offset_bottom = -18.0
 	button_grid.columns = 4 if not compact_layout else 2
 	next_reward_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	var reward_width: float = minf(380.0, viewport_size.x - side_margin * 2.0)
+	var reward_width: float = minf(350.0, viewport_size.x - side_margin * 2.0)
 	next_reward_panel.position = Vector2(
 		viewport_size.x - reward_width - side_margin,
 		top_panel.offset_bottom + 12.0
 	)
 	var reward_height: float = maxf(
-		98.0,
+		82.0,
 		next_reward_panel.get_combined_minimum_size().y
 	)
 	next_reward_panel.size = Vector2(reward_width, reward_height)
@@ -453,7 +463,7 @@ func _place_modal(panel: Control, desired_size: Vector2) -> void:
 
 
 func _make_info_label() -> Label:
-	var label: Label = _make_label("", 16, Color("#f1e8dc"))
+	var label: Label = _make_label("", 15, Color("#f1e8dc"))
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return label
 
@@ -469,10 +479,10 @@ func _make_label(text_value: String, font_size: int, color: Color) -> Label:
 func _make_button(text_value: String, callback: Callable, color: Color) -> Button:
 	var button: Button = Button.new()
 	button.text = text_value
-	button.custom_minimum_size = Vector2(150.0, 64.0)
+	button.custom_minimum_size = Vector2(140.0, 46.0)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	button.add_theme_font_size_override("font_size", 16)
+	button.add_theme_font_size_override("font_size", 14)
 	button.add_theme_stylebox_override("normal", _make_panel_style(color, 9))
 	button.add_theme_stylebox_override("hover", _make_panel_style(color.lightened(0.12), 9))
 	button.add_theme_stylebox_override("pressed", _make_panel_style(color.darkened(0.12), 9))
@@ -483,8 +493,8 @@ func _make_button(text_value: String, callback: Callable, color: Color) -> Butto
 
 func _make_utility_button(text_value: String, callback: Callable) -> Button:
 	var button: Button = _make_button(text_value, callback, Color(0.14, 0.16, 0.2, 0.92))
-	button.custom_minimum_size = Vector2(120.0, 36.0)
-	button.add_theme_font_size_override("font_size", 14)
+	button.custom_minimum_size = Vector2(110.0, 28.0)
+	button.add_theme_font_size_override("font_size", 12)
 	return button
 
 
