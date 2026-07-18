@@ -30,6 +30,7 @@ const REWARD_FONT_SIZE: int = 22
 const REWARD_SIDE_MARGIN: float = 24.0
 const REWARD_TOP_MARGIN: float = 165.0
 const REWARD_BOTTOM_MARGIN: float = 205.0
+const SHOW_ROUTE_DEBUG: bool = false
 
 var hole_position: Vector2 = Vector2.ZERO
 var resource_position: Vector2 = Vector2.ZERO
@@ -81,10 +82,14 @@ func _draw() -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	_draw_stage_background(viewport_size)
 	_draw_atmosphere(viewport_size)
-	draw_line(hole_position, resource_position, Color(1.0, 0.82, 0.42, 0.28), 6.0, true)
-	for marker_index: int in range(1, 8):
-		var marker_position: Vector2 = hole_position.lerp(resource_position, float(marker_index) / 8.0)
-		draw_circle(marker_position, 3.5, Color(1.0, 0.9, 0.56, 0.48))
+	if SHOW_ROUTE_DEBUG:
+		draw_line(hole_position, resource_position, Color(1.0, 0.82, 0.42, 0.28), 3.0, true)
+		for marker_index: int in range(1, 8):
+			var marker_position: Vector2 = hole_position.lerp(
+				resource_position,
+				float(marker_index) / 8.0
+			)
+			draw_circle(marker_position, 3.0, Color(1.0, 0.9, 0.56, 0.48))
 
 	_draw_mouse_hole()
 	_draw_resident_mice()
@@ -295,8 +300,16 @@ func _rebuild_mice(count: int) -> void:
 		var mouse_node: GatheringMouse = instance as GatheringMouse
 		add_child(mouse_node)
 		var lane_row: int = index % MAX_LANE_ROWS
-		var lane_offset: float = float(lane_row - MAX_LANE_ROWS / 2) * 10.0
-		var progress_offset: float = float(index / MAX_LANE_ROWS) * 32.0
+		var mice_in_first_group: int = mini(count, MAX_LANE_ROWS)
+		var centered_lane: float = (
+			float(lane_row)
+			- float(mice_in_first_group - 1) * 0.5
+		)
+		var lane_offset: float = centered_lane * 4.0
+		var progress_offset: float = (
+			float(lane_row) * 22.0
+			+ float(index / MAX_LANE_ROWS) * 12.0
+		)
 		mouse_node.configure(
 			hole_position + Vector2(progress_offset, 0.0),
 			resource_position,

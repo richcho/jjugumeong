@@ -97,7 +97,7 @@ func _build_interface() -> void:
 	var title_row: HBoxContainer = HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 14)
 	top_vbox.add_child(title_row)
-	title_label = _make_label("쥐구멍  ALPHA 0.2.3", 25, Color("#ffd969"))
+	title_label = _make_label("쥐구멍  ALPHA 0.2.4", 25, Color("#ffd969"))
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title_label)
 	save_label = _make_label("불러오는 중...", 14, Color("#afc9bd"))
@@ -374,7 +374,7 @@ func _update_responsive_layout() -> void:
 	var viewport_size: Vector2 = size
 	var compact_layout: bool = viewport_size.x < 1000.0
 	var side_margin: float = 28.0 if not compact_layout else 16.0
-	top_panel.set_offsets_preset(Control.PRESET_TOP_WIDE)
+	top_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	top_panel.offset_left = side_margin
 	top_panel.offset_top = 18.0
 	top_panel.offset_right = -side_margin
@@ -387,7 +387,7 @@ func _update_responsive_layout() -> void:
 			if compact_layout
 			else HORIZONTAL_ALIGNMENT_CENTER
 		)
-	bottom_panel.set_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	bottom_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom_panel.offset_left = side_margin
 	bottom_panel.offset_right = -side_margin
 	bottom_panel.offset_top = -158.0 if not compact_layout else -228.0

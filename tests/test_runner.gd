@@ -208,8 +208,16 @@ func _test_ui_layout() -> void:
 		"portrait top panel right bound"
 	)
 	_expect_true(
+		game_ui.top_panel.size.x >= host.size.x - 40.0,
+		"portrait top panel fills available width"
+	)
+	_expect_true(
 		game_ui.bottom_panel.position.y + game_ui.bottom_panel.size.y <= host.size.y,
 		"portrait bottom panel bound"
+	)
+	_expect_true(
+		game_ui.bottom_panel.size.x >= host.size.x - 40.0,
+		"portrait bottom panel fills available width"
 	)
 	_expect_true(game_ui.button_grid.columns == 2, "portrait action columns")
 	_expect_true(
