@@ -228,45 +228,7 @@ func _draw() -> void:
 	draw_set_transform(Vector2(0.0, bob_offset), body_rotation, body_scale)
 	var active_texture: Texture2D = CARRYING_TEXTURE if carrying else MOUSE_TEXTURE
 	draw_texture_rect(active_texture, Rect2(Vector2(-39.0, -53.0), Vector2(78.0, 53.0)), false)
-	_draw_speed_equipment(VisualProgression.speed_tier(GameManager.speed_level))
-	_draw_carry_equipment(VisualProgression.carry_tier(GameManager.carry_level))
 	draw_set_transform(Vector2.ZERO)
-
-
-func _draw_speed_equipment(tier: int) -> void:
-	if tier >= 1:
-		var scarf_color: Color = Color("#bd4052")
-		draw_line(Vector2(-13.0, -28.0), Vector2(-31.0, -22.0), scarf_color, 5.0, true)
-		draw_colored_polygon(
-			PackedVector2Array([
-				Vector2(-30.0, -25.0),
-				Vector2(-42.0, -31.0),
-				Vector2(-34.0, -18.0)
-			]),
-			scarf_color
-		)
-	if tier >= 2:
-		var shoe_color: Color = Color("#d6e5e8")
-		draw_line(Vector2(-17.0, -2.0), Vector2(-8.0, -2.0), shoe_color, 4.0, true)
-		draw_line(Vector2(11.0, -2.0), Vector2(21.0, -2.0), shoe_color, 4.0, true)
-	if tier >= 3:
-		draw_line(Vector2(-43.0, -14.0), Vector2(-53.0, -14.0), Color(0.95, 0.83, 0.52, 0.5), 2.0, true)
-		draw_line(Vector2(-40.0, -8.0), Vector2(-48.0, -6.0), Color(0.95, 0.83, 0.52, 0.35), 2.0, true)
-
-
-func _draw_carry_equipment(tier: int) -> void:
-	if tier < 1:
-		return
-	var bag_color: Color = Color("#8b633e")
-	if tier == 1:
-		draw_circle(Vector2(-5.0, -23.0), 7.0, bag_color)
-		draw_arc(Vector2(-5.0, -25.0), 8.0, PI, TAU, 10, Color("#d0a772"), 2.0, true)
-	else:
-		draw_rect(Rect2(Vector2(-17.0, -35.0), Vector2(18.0, 19.0)), bag_color, true)
-		draw_line(Vector2(-16.0, -34.0), Vector2(2.0, -17.0), Color("#d0a772"), 2.0, true)
-	if tier >= 3:
-		draw_circle(Vector2(-12.0, -14.0), 4.0, Color("#d7b65b"))
-		draw_line(Vector2(-18.0, -18.0), Vector2(-29.0, -10.0), Color("#c49b63"), 3.0, true)
 
 
 func _draw_ground_shadow(lift: float) -> void:

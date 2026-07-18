@@ -18,6 +18,7 @@ func _run_tests() -> void:
 	_test_colony_progression()
 	_test_next_reward_summary()
 	_test_region_selection()
+	_test_region_codex()
 	_test_region_events()
 	_test_reward_text_bounds()
 	_test_stage_backgrounds()
@@ -47,9 +48,9 @@ func _test_time_cap() -> void:
 func _test_build_info() -> void:
 	_expect_true(GameManager.display_name == "쥐구멍", "build display name")
 	_expect_true(GameManager.product_name == "r4", "build product name")
-	_expect_true(GameManager.build_version == "0.3.0", "build version")
+	_expect_true(GameManager.build_version == "0.3.1", "build version")
 	_expect_true(GameManager.build_phase == "V0.3 Alpha", "build phase")
-	_expect_true(GameManager.get_build_label() == "r4 0.3.0", "build label")
+	_expect_true(GameManager.get_build_label() == "r4 0.3.1", "build label")
 
 
 func _test_save_schema_migration() -> void:
@@ -227,19 +228,76 @@ func _test_region_selection() -> void:
 	GameManager.unlocked_stage_ids = previous_unlocked_ids
 
 
+func _test_region_codex() -> void:
+	var previous_stage_index: int = GameManager.current_stage_index
+	var previous_highest_index: int = GameManager.highest_unlocked_stage_index
+	var previous_total_cheese: float = GameManager.total_cheese
+	var previous_unlocked_ids: Array[String] = GameManager.unlocked_stage_ids.duplicate()
+	var previous_completed: Array[String] = GameManager.completed_region_event_ids.duplicate()
+
+	GameManager.total_cheese = 600.0
+	GameManager.call("_reconcile_unlocked_stages")
+	GameManager.current_stage_index = 0
+	GameManager.completed_region_event_ids = ["kitchen_cat_patrol"]
+	var entries: Array[Dictionary] = GameManager.get_region_codex_entries()
+	var progress: Dictionary = GameManager.get_region_codex_progress()
+	_expect_equal_int(entries.size(), 3, "region codex unlocked entry count")
+	_expect_equal_int(
+		_dictionary_int(progress, "discovered", 0),
+		1,
+		"region codex discovered count"
+	)
+	_expect_equal_int(
+		_dictionary_int(progress, "total", 0),
+		3,
+		"region codex total count"
+	)
+	if not entries.is_empty():
+		var kitchen: Dictionary = entries[0]
+		_expect_true(
+			_dictionary_bool(kitchen, "discovered", false),
+			"region codex discovery state"
+		)
+		_expect_true(
+			_dictionary_bool(kitchen, "current", false),
+			"region codex current state"
+		)
+		_expect_true(
+			not _dictionary_string(kitchen, "resource", "").is_empty(),
+			"region codex resource"
+		)
+		_expect_true(
+			not _dictionary_string(kitchen, "hazard", "").is_empty(),
+			"region codex hazard"
+		)
+
+	GameManager.current_stage_index = previous_stage_index
+	GameManager.highest_unlocked_stage_index = previous_highest_index
+	GameManager.total_cheese = previous_total_cheese
+	GameManager.unlocked_stage_ids = previous_unlocked_ids
+	GameManager.completed_region_event_ids = previous_completed
+
+
 func _test_region_events() -> void:
 	var previous_stage_index: int = GameManager.current_stage_index
 	var previous_highest_index: int = GameManager.highest_unlocked_stage_index
 	var previous_cheese: float = GameManager.cheese
 	var previous_total_cheese: float = GameManager.total_cheese
+	var previous_carry_level: int = GameManager.carry_level
+	var previous_golden_remaining: float = GameManager.golden_remaining
+	var previous_total_trips: int = GameManager.total_trips
+	var previous_unlocked_ids: Array[String] = GameManager.unlocked_stage_ids.duplicate()
 	var previous_completed: Array[String] = GameManager.completed_region_event_ids.duplicate()
 	var previous_cooldown: int = GameManager.next_region_event_unix
 	var previous_boost: float = GameManager.click_boost_remaining
 
 	GameManager.current_stage_index = 0
 	GameManager.highest_unlocked_stage_index = 0
+	GameManager.unlocked_stage_ids = ["old_kitchen"]
 	GameManager.cheese = 0.0
 	GameManager.total_cheese = 0.0
+	GameManager.carry_level = 0
+	GameManager.golden_remaining = 0.0
 	GameManager.completed_region_event_ids.clear()
 	GameManager.next_region_event_unix = 0
 	var region_event: Dictionary = GameManager.get_current_region_event()
@@ -252,16 +310,56 @@ func _test_region_events() -> void:
 	var result: Dictionary = GameManager.resolve_region_event(0)
 	_expect_true(not result.is_empty(), "region event resolves")
 	_expect_true(
+		_dictionary_bool(result, "first_discovery", false),
+		"first region event discovery result"
+	)
+	_expect_equal_int(
+		_dictionary_int(result, "reward", 0),
+		125,
+		"first region event total reward"
+	)
+	_expect_equal_int(
+		_dictionary_int(result, "first_discovery_reward", 0),
+		75,
+		"first region event bonus reward"
+	)
+	_expect_true(
 		GameManager.completed_region_event_ids.has("kitchen_cat_patrol"),
 		"region event discovery recorded"
 	)
 	_expect_true(GameManager.get_region_event_cooldown() > 0, "region event cooldown starts")
 	_expect_true(GameManager.resolve_region_event(1).is_empty(), "cooldown blocks repeated event")
 
+	GameManager.current_stage_index = 0
+	GameManager.highest_unlocked_stage_index = 0
+	GameManager.unlocked_stage_ids = ["old_kitchen"]
+	GameManager.cheese = 0.0
+	GameManager.total_cheese = 0.0
+	GameManager.next_region_event_unix = 0
+	var repeat_result: Dictionary = GameManager.resolve_region_event(0)
+	_expect_true(
+		not _dictionary_bool(repeat_result, "first_discovery", true),
+		"repeat region event is not first discovery"
+	)
+	_expect_equal_int(
+		_dictionary_int(repeat_result, "reward", 0),
+		50,
+		"repeat region event base reward"
+	)
+	_expect_equal_int(
+		_dictionary_int(repeat_result, "first_discovery_reward", -1),
+		0,
+		"repeat region event has no discovery bonus"
+	)
+
 	GameManager.current_stage_index = previous_stage_index
 	GameManager.highest_unlocked_stage_index = previous_highest_index
 	GameManager.cheese = previous_cheese
 	GameManager.total_cheese = previous_total_cheese
+	GameManager.carry_level = previous_carry_level
+	GameManager.golden_remaining = previous_golden_remaining
+	GameManager.total_trips = previous_total_trips
+	GameManager.unlocked_stage_ids = previous_unlocked_ids
 	GameManager.completed_region_event_ids = previous_completed
 	GameManager.next_region_event_unix = previous_cooldown
 	GameManager.click_boost_remaining = previous_boost
@@ -342,6 +440,11 @@ func _test_stage_choice_events() -> void:
 		_expect_true(not event_id.is_empty(), "stage choice event id")
 		_expect_true(not event_ids.has(event_id), "stage choice event id is unique")
 		event_ids.append(event_id)
+		_expect_equal_int(
+			_dictionary_int(region_event, "first_discovery_reward_trips", 0),
+			3,
+			"stage first discovery reward trips"
+		)
 		var choices_value: Variant = region_event.get("choices", [])
 		_expect_true(choices_value is Array, "stage choice options type")
 		if choices_value is Array:
@@ -519,6 +622,14 @@ func _test_ui_layout() -> void:
 		game_ui.region_panel.get_global_rect().end.x <= host.size.x,
 		"portrait region list right bound"
 	)
+	_expect_true(
+		game_ui.region_panel.get_global_rect().end.y <= host.size.y,
+		"portrait region list bottom bound"
+	)
+	_expect_true(
+		not game_ui.region_progress_label.text.is_empty(),
+		"region codex progress text"
+	)
 	GameManager.next_region_event_unix = previous_cooldown
 	host.queue_free()
 	await get_tree().process_frame
@@ -598,6 +709,20 @@ func _dictionary_int(data: Dictionary, key: String, fallback: int) -> int:
 	if value is float:
 		@warning_ignore("unsafe_call_argument")
 		return int(value)
+	return fallback
+
+
+func _dictionary_bool(data: Dictionary, key: String, fallback: bool) -> bool:
+	var value: Variant = data.get(key, fallback)
+	if value is bool:
+		return value
+	return fallback
+
+
+func _dictionary_string(data: Dictionary, key: String, fallback: String) -> String:
+	var value: Variant = data.get(key, fallback)
+	if value is String:
+		return value
 	return fallback
 
 

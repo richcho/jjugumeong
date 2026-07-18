@@ -3,7 +3,6 @@ extends Node2D
 
 const MOUSE_SCENE: PackedScene = preload("res://scenes/mouse/mouse.tscn")
 const GAME_FONT: FontFile = preload("res://assets/fonts/NotoSansKR-Full.ttf")
-const RESIDENT_MOUSE_TEXTURE: Texture2D = preload("res://assets/mouse/sprites/field_mouse-v2.png")
 const STAGE_BACKGROUNDS: Array[Texture2D] = [
 	preload("res://assets/background/stages/old_kitchen.jpg"),
 	preload("res://assets/background/stages/food_storage.jpg"),
@@ -91,9 +90,6 @@ func _draw() -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	_draw_stage_background(viewport_size)
 	_draw_atmosphere(viewport_size)
-	if GameManager.current_stage_index < STAGE_BACKGROUNDS.size():
-		_draw_embedded_hole_progress()
-		_draw_resident_mice()
 	if SHOW_ROUTE_DEBUG:
 		draw_line(hole_position, resource_position, Color(1.0, 0.82, 0.42, 0.28), 3.0, true)
 		for marker_index: int in range(1, 8):
@@ -201,25 +197,6 @@ func _draw_mouse_hole() -> void:
 	)
 
 
-func _draw_embedded_hole_progress() -> void:
-	var hole_tier: int = VisualProgression.hole_tier(GameManager.hole_level)
-	var pulse: float = 0.5 + sin(float(Time.get_ticks_msec()) * 0.004) * 0.12
-	draw_circle(hole_position, 45.0, Color(1.0, 0.63, 0.2, 0.05 + pulse * 0.05))
-	draw_arc(hole_position, 39.0, 0.15, PI - 0.15, 28, Color(1.0, 0.77, 0.36, 0.52), 3.0, true)
-	if hole_tier >= 1:
-		draw_line(hole_position + Vector2(-30.0, 20.0), hole_position + Vector2(-30.0, -20.0), Color("#b7834e"), 5.0, true)
-		draw_line(hole_position + Vector2(30.0, 20.0), hole_position + Vector2(30.0, -20.0), Color("#b7834e"), 5.0, true)
-	if hole_tier >= 2:
-		for item_index: int in range(3):
-			draw_circle(hole_position + Vector2(-18.0 + float(item_index) * 18.0, 28.0), 4.0, Color("#f0bd45"))
-	if hole_tier >= 3:
-		draw_circle(hole_position + Vector2(0.0, -42.0), 7.0, Color(1.0, 0.75, 0.28, pulse))
-	if hole_tier >= 4:
-		draw_rect(Rect2(hole_position + Vector2(-25.0, -57.0), Vector2(50.0, 11.0)), Color("#715039"), true)
-		draw_line(hole_position + Vector2(-20.0, 28.0), hole_position + Vector2(-35.0, 42.0), Color("#c49a62"), 3.0, true)
-		draw_line(hole_position + Vector2(20.0, 28.0), hole_position + Vector2(35.0, 42.0), Color("#c49a62"), 3.0, true)
-
-
 func _draw_cheese_resource() -> void:
 	if GameManager.current_stage_index < STAGE_BACKGROUNDS.size():
 		return
@@ -248,37 +225,6 @@ func _draw_cheese_resource() -> void:
 		20,
 		Color("#fff3d1")
 	)
-
-
-func _draw_resident_mice() -> void:
-	var resident_count: int = mini(maxi(0, GameManager.mouse_count - 1), 6)
-	var elapsed: float = float(Time.get_ticks_msec()) * 0.001
-	for index: int in range(resident_count):
-		var column: int = index % 3
-		var row: int = index / 3
-		var resident_position: Vector2 = hole_position + Vector2(
-			-52.0 + float(column) * 48.0,
-			92.0 + float(row) * 30.0 + sin(elapsed * 2.0 + float(index)) * 2.0
-		)
-		_draw_resident_mouse(resident_position, index)
-
-
-func _draw_resident_mouse(resident_position: Vector2, resident_index: int) -> void:
-	draw_set_transform(resident_position)
-	draw_texture_rect(
-		RESIDENT_MOUSE_TEXTURE,
-		Rect2(Vector2(-18.0, -24.0), Vector2(36.0, 24.0)),
-		false
-	)
-	if resident_index % 3 == 0:
-		draw_circle(Vector2(13.0, 4.0), 4.0, Color("#f0bd45"))
-		draw_line(Vector2(8.0, 2.0), Vector2(12.0, 3.0), Color("#e7d8bf"), 2.0, true)
-	elif resident_index % 3 == 1:
-		draw_line(Vector2(8.0, 2.0), Vector2(16.0, -5.0), Color("#c7a06a"), 2.0, true)
-		draw_line(Vector2(15.0, -5.0), Vector2(18.0, 2.0), Color("#c7a06a"), 2.0, true)
-	else:
-		draw_rect(Rect2(Vector2(9.0, -3.0), Vector2(8.0, 8.0)), Color("#8d6a47"), true)
-	draw_set_transform(Vector2.ZERO)
 
 
 func _update_layout() -> void:

@@ -99,14 +99,7 @@ func _notification(what: int) -> void:
 
 
 func collect_trip(base_amount: int) -> int:
-	var reward: float = (
-		float(base_amount)
-		* get_stage_bonus()
-		* ALPHA_TEST_REWARD_MULTIPLIER
-	)
-	if golden_remaining > 0.0:
-		reward *= GOLDEN_MULTIPLIER
-	var final_reward: int = maxi(1, roundi(reward))
+	var final_reward: int = _calculate_trip_reward(base_amount)
 	cheese += float(final_reward)
 	total_cheese += float(final_reward)
 	total_trips += 1
@@ -247,6 +240,36 @@ func get_unlocked_stages() -> Array[Dictionary]:
 	return result
 
 
+func get_region_codex_entries() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var unlocked_stages: Array[Dictionary] = get_unlocked_stages()
+	for index: int in range(unlocked_stages.size()):
+		var stage: Dictionary = unlocked_stages[index]
+		var region_event: Dictionary = _dictionary_dictionary(stage, "choice_event")
+		var event_id: String = _dictionary_string(region_event, "id", "")
+		result.append({
+			"stage_index": index,
+			"stage_id": _dictionary_string(stage, "id", ""),
+			"name": _dictionary_string(stage, "name", "지역"),
+			"resource": _dictionary_string(stage, "resource", "미확인 자원"),
+			"hazard": _dictionary_string(stage, "hazard", "미확인 위험"),
+			"event_title": _dictionary_string(region_event, "title", "미확인 사건"),
+			"discovered": completed_region_event_ids.has(event_id),
+			"current": index == current_stage_index
+		})
+	return result
+
+
+func get_region_codex_progress() -> Dictionary:
+	var entries: Array[Dictionary] = get_region_codex_entries()
+	var discovered: int = 0
+	for entry: Dictionary in entries:
+		var discovered_value: Variant = entry.get("discovered", false)
+		if discovered_value is bool and discovered_value:
+			discovered += 1
+	return {"discovered": discovered, "total": entries.size()}
+
+
 func select_stage(stage_index: int) -> bool:
 	if stage_index < 0 or stage_index > highest_unlocked_stage_index:
 		return false
@@ -316,16 +339,29 @@ func resolve_region_event(choice_index: int) -> Dictionary:
 		return {}
 	@warning_ignore("unsafe_cast")
 	var choice: Dictionary = choice_value as Dictionary
+	var event_id: String = _dictionary_string(region_event, "id", "")
+	var first_discovery: bool = (
+		not event_id.is_empty()
+		and not completed_region_event_ids.has(event_id)
+	)
 	var reward_trips: int = maxi(1, _dictionary_int(choice, "reward_trips", 1))
-	var reward: int = collect_trip(get_carry_capacity() * reward_trips)
+	var first_reward_trips: int = 0
+	if first_discovery:
+		first_reward_trips = maxi(
+			0,
+			_dictionary_int(region_event, "first_discovery_reward_trips", 0)
+		)
+		completed_region_event_ids.append(event_id)
+	var base_reward: int = _calculate_trip_reward(get_carry_capacity() * reward_trips)
+	var reward: int = collect_trip(
+		get_carry_capacity() * (reward_trips + first_reward_trips)
+	)
+	var first_discovery_reward: int = maxi(0, reward - base_reward)
 	if _dictionary_string(choice, "effect", "secure") == "rush":
 		var boost_seconds: float = _dictionary_float(choice, "boost_seconds", 8.0)
 		click_boost_remaining = maxf(click_boost_remaining, boost_seconds)
 		total_click_boosts += 1
 		EventBus.click_boost_changed.emit(true, click_boost_remaining)
-	var event_id: String = _dictionary_string(region_event, "id", "")
-	if not event_id.is_empty() and not completed_region_event_ids.has(event_id):
-		completed_region_event_ids.append(event_id)
 	next_region_event_unix = TimeManager.current_unix_time() + REGION_EVENT_COOLDOWN_SECONDS
 	EventBus.game_state_changed.emit()
 	save_now()
@@ -333,6 +369,8 @@ func resolve_region_event(choice_index: int) -> Dictionary:
 		"event_id": event_id,
 		"result": _dictionary_string(choice, "result", "원정대가 무사히 돌아왔습니다."),
 		"reward": reward,
+		"first_discovery": first_discovery,
+		"first_discovery_reward": first_discovery_reward,
 		"boosted": _dictionary_string(choice, "effect", "secure") == "rush"
 	}
 
@@ -489,6 +527,17 @@ func _spend_cheese(amount: int) -> bool:
 
 func _scaled_cost(base_cost: int, purchased_levels: int) -> int:
 	return roundi(float(base_cost) * pow(1.5, float(purchased_levels)))
+
+
+func _calculate_trip_reward(base_amount: int) -> int:
+	var reward: float = (
+		float(base_amount)
+		* get_stage_bonus()
+		* ALPHA_TEST_REWARD_MULTIPLIER
+	)
+	if golden_remaining > 0.0:
+		reward *= GOLDEN_MULTIPLIER
+	return maxi(1, roundi(reward))
 
 
 func _format_compact_number(value: float) -> String:
@@ -708,6 +757,14 @@ func _dictionary_string(data: Dictionary, key: String, fallback: String) -> Stri
 		@warning_ignore("unsafe_call_argument")
 		return String(value)
 	return fallback
+
+
+func _dictionary_dictionary(data: Dictionary, key: String) -> Dictionary:
+	var value: Variant = data.get(key, {})
+	if value is Dictionary:
+		@warning_ignore("unsafe_cast")
+		return value as Dictionary
+	return {}
 
 
 func _dictionary_string_array(data: Dictionary, key: String) -> Array[String]:
