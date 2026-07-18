@@ -2,7 +2,7 @@ class_name WorldView
 extends Node2D
 
 const MOUSE_SCENE: PackedScene = preload("res://scenes/mouse/mouse.tscn")
-const GAME_FONT: FontFile = preload("res://assets/fonts/NotoSansKR-Subset.ttf")
+const GAME_FONT: FontFile = preload("res://assets/fonts/NotoSansKR-Full.ttf")
 const RESIDENT_MOUSE_TEXTURE: Texture2D = preload("res://assets/mouse/sprites/field_mouse-v2.png")
 const STAGE_BACKGROUNDS: Array[Texture2D] = [
 	preload("res://assets/background/stages/old_kitchen.jpg"),
@@ -33,7 +33,7 @@ static var STAGE_ROUTE_CONTROLS: Array[PackedVector2Array] = [
 	PackedVector2Array([Vector2(390.0, 555.0), Vector2(650.0, 520.0), Vector2(890.0, 535.0)])
 ]
 const MAX_LANE_ROWS: int = 7
-const MAX_VISIBLE_WORK_GROUPS: int = 6
+const MAX_VISIBLE_WORK_GROUPS: int = 3
 const REWARD_FONT_SIZE: int = 22
 const REWARD_SIDE_MARGIN: float = 24.0
 const REWARD_TOP_MARGIN: float = 165.0

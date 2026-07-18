@@ -105,7 +105,7 @@ iPad Web 셸은 다음을 보장해야 합니다.
 ## 6. 한글과 에셋
 
 Godot Web 기본 대체 글꼴에 의존하지 않습니다.
-`assets/fonts/NotoSansKR-Subset.ttf`를 프로젝트 기본 글꼴과 직접 그리기 텍스트에
+`assets/fonts/NotoSansKR-Full.ttf`를 프로젝트 기본 글꼴과 직접 그리기 텍스트에
 사용합니다.
 
 서브셋 글꼴에 새 문자가 없을 수 있으므로, 사용자에게 보이는 한국어 문구를

@@ -28,7 +28,7 @@ window/handheld/orientation=0
 
 [gui]
 
-theme/custom_font="res://assets/fonts/NotoSansKR-Subset.ttf"
+theme/custom_font="res://assets/fonts/NotoSansKR-Full.ttf"
 
 [rendering]
 

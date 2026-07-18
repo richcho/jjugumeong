@@ -141,14 +141,14 @@ func _test_reward_text_bounds() -> void:
 
 
 func _test_korean_font() -> void:
-	var font_path: String = "res://assets/fonts/NotoSansKR-Subset.ttf"
+	var font_path: String = "res://assets/fonts/NotoSansKR-Full.ttf"
 	var configured_font_path: String = str(ProjectSettings.get_setting("gui/theme/custom_font", ""))
 	_expect_true(configured_font_path == font_path, "Korean font is configured")
 	var game_font: FontFile = load(font_path) as FontFile
 	_expect_true(game_font != null, "Korean font loads")
 	if game_font == null:
 		return
-	for character: String in "쥐구멍치즈황금저장":
+	for character: String in "쥐구멍치즈황금저장세계소식기계실톱니길안전화완료대표결성":
 		_expect_true(game_font.has_char(character.unicode_at(0)), "font glyph %s" % character)
 
 

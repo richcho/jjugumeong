@@ -322,7 +322,11 @@ func _refresh_all() -> void:
 	stage_label.text = "지역  %s" % _dictionary_string(stage, "name", "낡은 부엌")
 	cheese_label.text = "치즈  %s" % _format_number(GameManager.cheese)
 	production_label.text = "예상 생산  %s/초" % _format_number(GameManager.get_expected_per_second())
-	mouse_label.text = "쥐  %d마리" % GameManager.mouse_count
+	var visible_groups: int = mini(GameManager.mouse_count, 3)
+	mouse_label.text = "쥐  %d마리 · 활동조 %d" % [
+		GameManager.mouse_count,
+		visible_groups
+	]
 	speed_button.text = "속도 강화 Lv.%d\n치즈 %d" % [GameManager.speed_level, GameManager.get_speed_upgrade_cost()]
 	carry_button.text = "운반량 %d → %d\n치즈 %d" % [
 		GameManager.get_carry_capacity(),
