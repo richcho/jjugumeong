@@ -105,7 +105,9 @@ func _test_stage_backgrounds() -> void:
 	for path: String in [
 		"res://assets/background/stages/old_kitchen.jpg",
 		"res://assets/background/stages/food_storage.jpg",
-		"res://assets/background/stages/convenience_store.jpg"
+		"res://assets/background/stages/convenience_store.jpg",
+		"res://assets/background/stages/restaurant.jpg",
+		"res://assets/background/stages/cheese_factory.jpg"
 	]:
 		var background: Texture2D = load(path) as Texture2D
 		_expect_true(background != null, "stage background loads: %s" % path)

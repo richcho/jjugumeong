@@ -6,7 +6,9 @@ const GAME_FONT: FontFile = preload("res://assets/fonts/NotoSansKR-Subset.ttf")
 const STAGE_BACKGROUNDS: Array[Texture2D] = [
 	preload("res://assets/background/stages/old_kitchen.jpg"),
 	preload("res://assets/background/stages/food_storage.jpg"),
-	preload("res://assets/background/stages/convenience_store.jpg")
+	preload("res://assets/background/stages/convenience_store.jpg"),
+	preload("res://assets/background/stages/restaurant.jpg"),
+	preload("res://assets/background/stages/cheese_factory.jpg")
 ]
 const MAX_LANE_ROWS: int = 7
 const REWARD_FONT_SIZE: int = 22
@@ -70,6 +72,7 @@ func _draw() -> void:
 		draw_circle(marker_position, 3.5, Color(1.0, 0.9, 0.56, 0.48))
 
 	_draw_mouse_hole()
+	_draw_resident_mice()
 	_draw_cheese_resource()
 
 	for effect: Dictionary in _effects:
@@ -197,6 +200,37 @@ func _draw_cheese_resource() -> void:
 		20,
 		Color("#fff3d1")
 	)
+
+
+func _draw_resident_mice() -> void:
+	var resident_count: int = mini(maxi(0, GameManager.mouse_count - 1), 6)
+	var elapsed: float = float(Time.get_ticks_msec()) * 0.001
+	for index: int in range(resident_count):
+		var column: int = index % 3
+		var row: int = index / 3
+		var resident_position: Vector2 = hole_position + Vector2(
+			-52.0 + float(column) * 48.0,
+			92.0 + float(row) * 30.0 + sin(elapsed * 2.0 + float(index)) * 2.0
+		)
+		_draw_resident_mouse(resident_position, index)
+
+
+func _draw_resident_mouse(resident_position: Vector2, resident_index: int) -> void:
+	draw_set_transform(resident_position)
+	var body_color: Color = Color("#7f8993") if resident_index % 2 == 0 else Color("#a58c7a")
+	draw_circle(Vector2.ZERO, 9.0, Color("#2d2931"))
+	draw_circle(Vector2.ZERO, 7.0, body_color)
+	draw_circle(Vector2(-4.0, -6.0), 3.2, Color("#d39ca6"))
+	draw_circle(Vector2(5.0, -1.0), 1.8, Color("#e5bcc2"))
+	if resident_index % 3 == 0:
+		draw_circle(Vector2(13.0, 4.0), 4.0, Color("#f0bd45"))
+		draw_line(Vector2(8.0, 2.0), Vector2(12.0, 3.0), Color("#e7d8bf"), 2.0, true)
+	elif resident_index % 3 == 1:
+		draw_line(Vector2(8.0, 2.0), Vector2(16.0, -5.0), Color("#c7a06a"), 2.0, true)
+		draw_line(Vector2(15.0, -5.0), Vector2(18.0, 2.0), Color("#c7a06a"), 2.0, true)
+	else:
+		draw_rect(Rect2(Vector2(9.0, -3.0), Vector2(8.0, 8.0)), Color("#8d6a47"), true)
+	draw_set_transform(Vector2.ZERO)
 
 
 func _update_layout() -> void:

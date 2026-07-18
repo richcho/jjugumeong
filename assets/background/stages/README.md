@@ -8,6 +8,8 @@ Godot 게임 화면에서 사용하는 1280×720 JPG 배경입니다. 생성 원
 | `old_kitchen.jpg` | 낡은 부엌 | 쥐 시점, 갈라진 벽, 따뜻한 부엌 |
 | `food_storage.jpg` | 식료품 창고 | 선반, 마대, 푸른 저장 공간 |
 | `convenience_store.jpg` | 동네 편의점 | 야간 냉장고, 청록·분홍빛 원정 |
+| `restaurant.jpg` | 대형 식당 | 조리대, 구리 조리 도구, 따뜻한 화로빛 |
+| `cheese_factory.jpg` | 치즈 공장 | 배관, 숙성실, 황금빛 기계 시대 |
 
 생성 방식: OpenAI 내장 이미지 생성 도구
 
