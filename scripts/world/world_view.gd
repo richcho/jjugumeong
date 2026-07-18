@@ -25,6 +25,13 @@ const STAGE_RESOURCE_ANCHORS: Array[Vector2] = [
 	Vector2(1110.0, 485.0),
 	Vector2(1080.0, 475.0)
 ]
+static var STAGE_ROUTE_CONTROLS: Array[PackedVector2Array] = [
+	PackedVector2Array([Vector2(390.0, 470.0), Vector2(700.0, 430.0), Vector2(930.0, 455.0)]),
+	PackedVector2Array([Vector2(350.0, 490.0), Vector2(650.0, 440.0), Vector2(930.0, 455.0)]),
+	PackedVector2Array([Vector2(370.0, 500.0), Vector2(650.0, 450.0), Vector2(920.0, 470.0)]),
+	PackedVector2Array([Vector2(360.0, 520.0), Vector2(650.0, 455.0), Vector2(910.0, 475.0)]),
+	PackedVector2Array([Vector2(370.0, 485.0), Vector2(650.0, 435.0), Vector2(900.0, 455.0)])
+]
 const MAX_LANE_ROWS: int = 7
 const REWARD_FONT_SIZE: int = 22
 const REWARD_SIDE_MARGIN: float = 24.0
@@ -37,6 +44,7 @@ var resource_position: Vector2 = Vector2.ZERO
 var _mouse_nodes: Array[GatheringMouse] = []
 var _effects: Array[Dictionary] = []
 var _stage_color: Color = Color("#352a3b")
+var _route_points: PackedVector2Array = PackedVector2Array()
 
 
 func _ready() -> void:
@@ -281,12 +289,18 @@ func _update_layout() -> void:
 			background,
 			viewport_size
 		)
+		_route_points = _build_stage_route(
+			GameManager.current_stage_index,
+			background,
+			viewport_size
+		)
 	else:
 		var vertical_center: float = clampf(viewport_size.y * 0.68, 260.0, viewport_size.y - 190.0)
 		hole_position = Vector2(maxf(90.0, viewport_size.x * 0.13), vertical_center)
 		resource_position = Vector2(minf(viewport_size.x - 90.0, viewport_size.x * 0.87), vertical_center)
+		_route_points = PackedVector2Array([hole_position, resource_position])
 	for mouse_node: GatheringMouse in _mouse_nodes:
-		mouse_node.update_route(hole_position, resource_position)
+		mouse_node.update_route_points(_route_points)
 	queue_redraw()
 
 
@@ -306,15 +320,12 @@ func _rebuild_mice(count: int) -> void:
 			- float(mice_in_first_group - 1) * 0.5
 		)
 		var lane_offset: float = centered_lane * 4.0
-		var progress_offset: float = (
-			float(lane_row) * 22.0
-			+ float(index / MAX_LANE_ROWS) * 12.0
-		)
-		mouse_node.configure(
-			hole_position + Vector2(progress_offset, 0.0),
-			resource_position,
+		var initial_progress: float = fposmod(float(index) * 0.13, 0.88)
+		mouse_node.configure_route(
+			_route_points,
 			lane_offset,
-			index
+			index,
+			initial_progress
 		)
 		mouse_node.reward_delivered.connect(_on_reward_delivered)
 		_mouse_nodes.append(mouse_node)
@@ -380,6 +391,18 @@ func _background_point_to_viewport(
 		clampf(normalized_point.x * viewport_size.x, 44.0, viewport_size.x - 44.0),
 		clampf(normalized_point.y * viewport_size.y, 185.0, viewport_size.y - 165.0)
 	)
+
+
+func _build_stage_route(
+	stage_index: int,
+	background: Texture2D,
+	viewport_size: Vector2
+) -> PackedVector2Array:
+	var result: PackedVector2Array = PackedVector2Array([hole_position])
+	for texture_point: Vector2 in STAGE_ROUTE_CONTROLS[stage_index]:
+		result.append(_background_point_to_viewport(texture_point, background, viewport_size))
+	result.append(resource_position)
+	return result
 
 
 func _clamp_reward_position(

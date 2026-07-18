@@ -14,6 +14,7 @@ func _run_tests() -> void:
 	_test_reward_text_bounds()
 	_test_stage_backgrounds()
 	_test_background_anchor_alignment()
+	_test_perspective_route()
 	_test_mouse_sprites()
 	_test_korean_font()
 	_test_save_round_trip()
@@ -162,6 +163,42 @@ func _test_background_anchor_alignment() -> void:
 		_expect_true(landscape_position.y > 400.0, "landscape mouse stays on floor")
 		_expect_true(ipad_position.y > 450.0, "iPad mouse stays on floor")
 		_expect_true(ipad_position.x >= 44.0, "iPad cropped hole stays visible")
+	world_view.free()
+
+
+func _test_perspective_route() -> void:
+	var world_view: WorldView = WorldView.new()
+	var background: Texture2D = load(
+		"res://assets/background/stages/restaurant.jpg"
+	) as Texture2D
+	var viewport_size: Vector2 = Vector2(1366.0, 1024.0)
+	@warning_ignore("unsafe_cast")
+	world_view.hole_position = world_view.call(
+		"_background_point_to_viewport",
+		Vector2(155.0, 495.0),
+		background,
+		viewport_size
+	) as Vector2
+	@warning_ignore("unsafe_cast")
+	world_view.resource_position = world_view.call(
+		"_background_point_to_viewport",
+		Vector2(1110.0, 485.0),
+		background,
+		viewport_size
+	) as Vector2
+	var route_value: Variant = world_view.call(
+		"_build_stage_route",
+		3,
+		background,
+		viewport_size
+	)
+	_expect_true(route_value is PackedVector2Array, "perspective route type")
+	if route_value is PackedVector2Array:
+		@warning_ignore("unsafe_cast")
+		var route: PackedVector2Array = route_value as PackedVector2Array
+		_expect_equal_int(route.size(), 5, "perspective route control count")
+		_expect_true(route[2].y < route[0].y, "perspective route enters distant floor")
+		_expect_true(route[2].y < route[route.size() - 1].y, "perspective route returns foreground")
 	world_view.free()
 
 
