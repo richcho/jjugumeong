@@ -35,6 +35,13 @@ var tutorial_panel: PanelContainer
 var tutorial_text: Label
 var offline_panel: PanelContainer
 var offline_text: Label
+var region_panel: PanelContainer
+var region_list: VBoxContainer
+var region_event_panel: PanelContainer
+var region_event_title: Label
+var region_event_description: Label
+var region_choice_buttons: Array[Button] = []
+var region_event_button: Button
 
 var _toast_remaining: float = 0.0
 var _refresh_elapsed: float = 0.0
@@ -176,6 +183,9 @@ func _build_interface() -> void:
 	utility_row.add_theme_constant_override("separation", 7)
 	bottom_content.add_child(utility_row)
 	utility_row.add_child(_make_utility_button("통계", _show_stats))
+	utility_row.add_child(_make_utility_button("지역", _show_regions))
+	region_event_button = _make_utility_button("지역 사건", _show_region_event)
+	utility_row.add_child(region_event_button)
 	utility_row.add_child(_make_utility_button("지금 저장", _save_manually))
 
 	toast_label = _make_label("", 20, Color("#fff4d4"))
@@ -191,6 +201,8 @@ func _build_interface() -> void:
 	_build_next_reward_panel()
 	_build_discovery_panel()
 	_build_stats_panel()
+	_build_region_panel()
+	_build_region_event_panel()
 	_build_tutorial_panel()
 	_build_offline_panel()
 
@@ -269,6 +281,60 @@ func _build_stats_panel() -> void:
 	content.add_child(_make_button("닫기", _hide_stats, Color("#5d486f")))
 
 
+func _build_region_panel() -> void:
+	region_panel = PanelContainer.new()
+	region_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.055, 0.045, 0.07, 0.98), 16)
+	)
+	region_panel.hide()
+	add_child(region_panel)
+	var margin: MarginContainer = _make_margin(20)
+	region_panel.add_child(margin)
+	var content: VBoxContainer = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	margin.add_child(content)
+	var heading: Label = _make_label("해금 지역", 24, Color("#ffd969"))
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(heading)
+	region_list = VBoxContainer.new()
+	region_list.add_theme_constant_override("separation", 6)
+	region_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(region_list)
+	content.add_child(_make_button("닫기", _hide_regions, Color("#5d486f")))
+
+
+func _build_region_event_panel() -> void:
+	region_event_panel = PanelContainer.new()
+	region_event_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.055, 0.04, 0.065, 0.98), 16)
+	)
+	region_event_panel.hide()
+	add_child(region_event_panel)
+	var margin: MarginContainer = _make_margin(20)
+	region_event_panel.add_child(margin)
+	var content: VBoxContainer = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	margin.add_child(content)
+	region_event_title = _make_label("", 24, Color("#ffd969"))
+	region_event_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(region_event_title)
+	region_event_description = _make_label("", 17, Color("#eee7f0"))
+	region_event_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	region_event_description.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(region_event_description)
+	for choice_index: int in range(2):
+		var choice_button: Button = _make_button(
+			"",
+			_resolve_region_event.bind(choice_index),
+			Color("#4e6755")
+		)
+		content.add_child(choice_button)
+		region_choice_buttons.append(choice_button)
+	content.add_child(_make_button("나중에 결정", _hide_region_event, Color("#5d486f")))
+
+
 func _build_tutorial_panel() -> void:
 	tutorial_panel = PanelContainer.new()
 	tutorial_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.07, 0.055, 0.09, 0.98), 16))
@@ -314,6 +380,7 @@ func _build_offline_panel() -> void:
 func _connect_events() -> void:
 	EventBus.game_state_changed.connect(_refresh_all)
 	EventBus.stage_changed.connect(_on_stage_changed)
+	EventBus.stage_discovered.connect(_on_stage_discovered)
 	EventBus.golden_cheese_changed.connect(_on_golden_changed)
 	EventBus.click_boost_changed.connect(_on_boost_changed)
 	EventBus.save_status_changed.connect(_on_save_status_changed)
@@ -357,6 +424,13 @@ func _refresh_all() -> void:
 	carry_button.disabled = GameManager.cheese < float(GameManager.get_carry_upgrade_cost())
 	mouse_button.disabled = GameManager.cheese < float(GameManager.get_mouse_cost())
 	hole_button.disabled = GameManager.cheese < float(GameManager.get_hole_upgrade_cost())
+	var event_cooldown: int = GameManager.get_region_event_cooldown()
+	region_event_button.text = (
+		"지역 사건 %d초" % event_cooldown
+		if event_cooldown > 0
+		else "지역 사건"
+	)
+	region_event_button.disabled = event_cooldown > 0
 
 	var reward: Dictionary = GameManager.get_next_reward_summary()
 	var reward_current: float = _dictionary_float(reward, "current", 0.0)
@@ -416,6 +490,8 @@ func _update_responsive_layout() -> void:
 	)
 	toast_label.size = Vector2(toast_width, 68.0 if compact_layout else 54.0)
 	_place_modal(stats_panel, Vector2(430.0, 380.0))
+	_place_modal(region_panel, Vector2(500.0, 440.0))
+	_place_modal(region_event_panel, Vector2(560.0, 390.0))
 	_place_modal(tutorial_panel, Vector2(480.0, 280.0))
 	_place_modal(offline_panel, Vector2(480.0, 260.0))
 	_place_modal(discovery_panel, Vector2(520.0, 150.0))
@@ -526,6 +602,7 @@ func _show_stats() -> void:
 		+ "플레이 시간: %s\n"
 		+ "클릭 부스트: %d회\n"
 		+ "황금치즈 사건: %d회\n"
+		+ "발견한 지역 사건: %d개\n"
 		+ "현재 생산 보너스: %.2f배"
 	) % [
 		_format_number(GameManager.total_cheese),
@@ -533,6 +610,7 @@ func _show_stats() -> void:
 		TimeManager.format_duration(int(GameManager.play_time_seconds)),
 		GameManager.total_click_boosts,
 		GameManager.total_golden_events,
+		GameManager.completed_region_event_ids.size(),
 		GameManager.get_stage_bonus()
 	]
 	stats_panel.show()
@@ -541,6 +619,94 @@ func _show_stats() -> void:
 
 func _hide_stats() -> void:
 	stats_panel.hide()
+
+
+func _show_regions() -> void:
+	for child: Node in region_list.get_children():
+		child.queue_free()
+	var unlocked_stages: Array[Dictionary] = GameManager.get_unlocked_stages()
+	for index: int in range(unlocked_stages.size()):
+		var stage: Dictionary = unlocked_stages[index]
+		var event_value: Variant = stage.get("choice_event", {})
+		var event_id: String = ""
+		if event_value is Dictionary:
+			@warning_ignore("unsafe_cast")
+			event_id = _dictionary_string(event_value as Dictionary, "id", "")
+		var discovered: bool = GameManager.completed_region_event_ids.has(event_id)
+		var suffix: String = " · 사건 발견" if discovered else " · 사건 미발견"
+		if index == GameManager.current_stage_index:
+			suffix = " · 현재 지역" + (" · 사건 발견" if discovered else "")
+		var button: Button = _make_button(
+			"%s%s" % [_dictionary_string(stage, "name", "지역"), suffix],
+			_select_region.bind(index),
+			Color("#49695f") if index != GameManager.current_stage_index else Color("#6d5341")
+		)
+		button.disabled = index == GameManager.current_stage_index
+		region_list.add_child(button)
+	region_panel.show()
+	region_panel.move_to_front()
+
+
+func _hide_regions() -> void:
+	region_panel.hide()
+
+
+func _select_region(stage_index: int) -> void:
+	if GameManager.select_stage(stage_index):
+		region_panel.hide()
+
+
+func _show_region_event() -> void:
+	var cooldown: int = GameManager.get_region_event_cooldown()
+	if cooldown > 0:
+		_show_toast("다음 지역 사건까지 %d초" % cooldown)
+		return
+	var region_event: Dictionary = GameManager.get_current_region_event()
+	if region_event.is_empty():
+		_show_toast("이 지역에는 아직 사건이 없습니다.")
+		return
+	region_event_title.text = _dictionary_string(region_event, "title", "지역 사건")
+	region_event_description.text = _dictionary_string(
+		region_event,
+		"description",
+		"원정대의 대응을 선택하세요."
+	)
+	var choices_value: Variant = region_event.get("choices", [])
+	if not choices_value is Array:
+		return
+	@warning_ignore("unsafe_cast")
+	var choices: Array = choices_value as Array
+	if choices.size() != 2:
+		return
+	for index: int in range(2):
+		var choice_value: Variant = choices[index]
+		if choice_value is Dictionary:
+			@warning_ignore("unsafe_cast")
+			region_choice_buttons[index].text = _dictionary_string(
+				choice_value as Dictionary,
+				"label",
+				"선택"
+			)
+	region_event_panel.show()
+	region_event_panel.move_to_front()
+
+
+func _hide_region_event() -> void:
+	region_event_panel.hide()
+
+
+func _resolve_region_event(choice_index: int) -> void:
+	var result: Dictionary = GameManager.resolve_region_event(choice_index)
+	if result.is_empty():
+		_show_toast("지금은 사건을 해결할 수 없습니다.")
+		return
+	region_event_panel.hide()
+	_show_toast(
+		"%s · 치즈 +%s" % [
+			_dictionary_string(result, "result", "원정 완료"),
+			_format_number(_dictionary_float(result, "reward", 0.0))
+		]
+	)
 
 
 func _show_tutorial() -> void:
@@ -591,6 +757,9 @@ func _show_toast(message: String) -> void:
 
 func _on_stage_changed(_stage_index: int) -> void:
 	_refresh_all()
+
+
+func _on_stage_discovered(_stage_index: int) -> void:
 	var stage: Dictionary = GameManager.get_current_stage()
 	discovery_title.text = "새 지역 발견  ·  %s" % _dictionary_string(stage, "name", "")
 	discovery_detail.text = _get_stage_preview(GameManager.current_stage_index)

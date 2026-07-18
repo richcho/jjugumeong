@@ -16,6 +16,7 @@ const CLICK_BOOST_MULTIPLIER: float = 1.25
 const GOLDEN_EVENT_MIN_DELAY: float = 35.0
 const GOLDEN_EVENT_MAX_DELAY: float = 65.0
 const ESTIMATED_ONE_WAY_DISTANCE: float = 760.0
+const REGION_EVENT_COOLDOWN_SECONDS: int = 30
 
 var cheese: float = 0.0
 var total_cheese: float = 0.0
@@ -24,6 +25,10 @@ var speed_level: int = 0
 var carry_level: int = 0
 var hole_level: int = 1
 var current_stage_index: int = 0
+var highest_unlocked_stage_index: int = 0
+var unlocked_stage_ids: Array[String] = []
+var completed_region_event_ids: Array[String] = []
+var next_region_event_unix: int = 0
 var tutorial_step: int = 0
 var golden_remaining: float = 0.0
 var click_boost_remaining: float = 0.0
@@ -49,6 +54,7 @@ func _ready() -> void:
 	_load_stages()
 	var loaded_data: Dictionary = SaveManager.load_game(_default_save_data())
 	_apply_save_data(loaded_data)
+	_reconcile_unlocked_stages()
 	_calculate_offline_reward()
 	_next_golden_event = randf_range(GOLDEN_EVENT_MIN_DELAY, GOLDEN_EVENT_MAX_DELAY)
 	_is_ready = true
@@ -228,10 +234,34 @@ func get_current_stage() -> Dictionary:
 
 
 func get_next_stage() -> Dictionary:
-	var next_index: int = current_stage_index + 1
+	var next_index: int = highest_unlocked_stage_index + 1
 	if next_index >= stages.size():
 		return {}
 	return stages[next_index]
+
+
+func get_unlocked_stages() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for index: int in range(mini(highest_unlocked_stage_index + 1, stages.size())):
+		result.append(stages[index])
+	return result
+
+
+func select_stage(stage_index: int) -> bool:
+	if stage_index < 0 or stage_index > highest_unlocked_stage_index:
+		return false
+	if stage_index >= stages.size():
+		return false
+	if stage_index == current_stage_index:
+		return true
+	current_stage_index = stage_index
+	EventBus.stage_changed.emit(current_stage_index)
+	EventBus.toast_requested.emit(
+		"지역 이동: %s" % _dictionary_string(get_current_stage(), "name", "")
+	)
+	EventBus.game_state_changed.emit()
+	save_now()
+	return true
 
 
 func get_build_label() -> String:
@@ -253,6 +283,64 @@ func get_world_news() -> String:
 		return "정찰대가 다음 통로를 조사 중"
 	var news_index: int = int(play_time_seconds / 12.0) % combined.size()
 	return combined[news_index]
+
+
+func get_current_region_event() -> Dictionary:
+	var stage: Dictionary = get_current_stage()
+	var event_value: Variant = stage.get("choice_event", {})
+	if event_value is Dictionary:
+		@warning_ignore("unsafe_cast")
+		return (event_value as Dictionary).duplicate(true)
+	return {}
+
+
+func get_region_event_cooldown() -> int:
+	return maxi(0, next_region_event_unix - TimeManager.current_unix_time())
+
+
+func resolve_region_event(choice_index: int) -> Dictionary:
+	if get_region_event_cooldown() > 0:
+		return {}
+	var region_event: Dictionary = get_current_region_event()
+	if region_event.is_empty():
+		return {}
+	var choices_value: Variant = region_event.get("choices", [])
+	if not choices_value is Array:
+		return {}
+	@warning_ignore("unsafe_cast")
+	var choices: Array = choices_value as Array
+	if choice_index < 0 or choice_index >= choices.size():
+		return {}
+	var choice_value: Variant = choices[choice_index]
+	if not choice_value is Dictionary:
+		return {}
+	@warning_ignore("unsafe_cast")
+	var choice: Dictionary = choice_value as Dictionary
+	var reward_trips: int = maxi(1, _dictionary_int(choice, "reward_trips", 1))
+	var reward: int = collect_trip(get_carry_capacity() * reward_trips)
+	if _dictionary_string(choice, "effect", "secure") == "rush":
+		var boost_seconds: float = _dictionary_float(choice, "boost_seconds", 8.0)
+		click_boost_remaining = maxf(click_boost_remaining, boost_seconds)
+		total_click_boosts += 1
+		EventBus.click_boost_changed.emit(true, click_boost_remaining)
+	var event_id: String = _dictionary_string(region_event, "id", "")
+	if not event_id.is_empty() and not completed_region_event_ids.has(event_id):
+		completed_region_event_ids.append(event_id)
+	next_region_event_unix = TimeManager.current_unix_time() + REGION_EVENT_COOLDOWN_SECONDS
+	EventBus.game_state_changed.emit()
+	save_now()
+	return {
+		"event_id": event_id,
+		"result": _dictionary_string(choice, "result", "원정대가 무사히 돌아왔습니다."),
+		"reward": reward,
+		"boosted": _dictionary_string(choice, "effect", "secure") == "rush"
+	}
+
+
+func is_current_region_event_discovered() -> bool:
+	var region_event: Dictionary = get_current_region_event()
+	var event_id: String = _dictionary_string(region_event, "id", "")
+	return not event_id.is_empty() and completed_region_event_ids.has(event_id)
 
 
 func get_colony_rank() -> String:
@@ -324,7 +412,7 @@ func get_next_reward_summary() -> Dictionary:
 	var current_threshold: float = _dictionary_float(stage, "unlock_total_cheese", 0.0)
 	var target_threshold: float = _dictionary_float(next_stage, "unlock_total_cheese", 0.0)
 	var needed: float = maxf(0.0, target_threshold - total_cheese)
-	var next_index: int = current_stage_index + 1
+	var next_index: int = highest_unlocked_stage_index + 1
 	return {
 		"kind": "stage",
 		"title": "다음 보상 · %s" % _dictionary_string(next_stage, "name", ""),
@@ -415,14 +503,17 @@ func _format_compact_number(value: float) -> String:
 
 
 func _update_unlocked_stage() -> void:
-	var unlocked_index: int = current_stage_index
+	var unlocked_index: int = highest_unlocked_stage_index
 	for index: int in range(stages.size()):
 		var threshold: float = _dictionary_float(stages[index], "unlock_total_cheese", 0.0)
 		if total_cheese >= threshold:
 			unlocked_index = index
-	if unlocked_index != current_stage_index:
+	if unlocked_index > highest_unlocked_stage_index:
+		highest_unlocked_stage_index = unlocked_index
+		_rebuild_unlocked_stage_ids()
 		current_stage_index = unlocked_index
 		EventBus.stage_changed.emit(current_stage_index)
+		EventBus.stage_discovered.emit(current_stage_index)
 		EventBus.toast_requested.emit(
 			"새 지역 개방: %s" % _dictionary_string(get_current_stage(), "name", "")
 		)
@@ -452,7 +543,10 @@ func _default_save_data() -> Dictionary:
 		"speed_level": 0,
 		"carry_level": 0,
 		"hole_level": 1,
-		"current_stage_index": 0,
+		"selected_stage_index": 0,
+		"unlocked_stage_ids": [],
+		"completed_region_event_ids": [],
+		"next_region_event_unix": 0,
 		"tutorial_step": 0,
 		"play_time_seconds": 0.0,
 		"total_trips": 0,
@@ -470,9 +564,22 @@ func _apply_save_data(data: Dictionary) -> void:
 	carry_level = maxi(0, _dictionary_int(data, "carry_level", 0))
 	hole_level = maxi(1, _dictionary_int(data, "hole_level", 1))
 	current_stage_index = clampi(
-		_dictionary_int(data, "current_stage_index", 0),
+		_dictionary_int(
+			data,
+			"selected_stage_index",
+			_dictionary_int(data, "current_stage_index", 0)
+		),
 		0,
 		maxi(0, stages.size() - 1)
+	)
+	unlocked_stage_ids = _dictionary_string_array(data, "unlocked_stage_ids")
+	completed_region_event_ids = _dictionary_string_array(
+		data,
+		"completed_region_event_ids"
+	)
+	next_region_event_unix = maxi(
+		0,
+		_dictionary_int(data, "next_region_event_unix", 0)
 	)
 	tutorial_step = clampi(_dictionary_int(data, "tutorial_step", 0), 0, 4)
 	play_time_seconds = maxf(0.0, _dictionary_float(data, "play_time_seconds", 0.0))
@@ -491,7 +598,10 @@ func _build_save_data() -> Dictionary:
 		"speed_level": speed_level,
 		"carry_level": carry_level,
 		"hole_level": hole_level,
-		"current_stage_index": current_stage_index,
+		"selected_stage_index": current_stage_index,
+		"unlocked_stage_ids": unlocked_stage_ids.duplicate(),
+		"completed_region_event_ids": completed_region_event_ids.duplicate(),
+		"next_region_event_unix": next_region_event_unix,
 		"tutorial_step": tutorial_step,
 		"play_time_seconds": play_time_seconds,
 		"total_trips": total_trips,
@@ -520,6 +630,28 @@ func _load_stages() -> void:
 			stages.append(raw_stage as Dictionary)
 	if stages.is_empty():
 		_use_fallback_stage()
+
+
+func _reconcile_unlocked_stages() -> void:
+	highest_unlocked_stage_index = 0
+	for index: int in range(stages.size()):
+		var threshold: float = _dictionary_float(stages[index], "unlock_total_cheese", 0.0)
+		if total_cheese >= threshold:
+			highest_unlocked_stage_index = index
+	current_stage_index = clampi(
+		current_stage_index,
+		0,
+		highest_unlocked_stage_index
+	)
+	_rebuild_unlocked_stage_ids()
+
+
+func _rebuild_unlocked_stage_ids() -> void:
+	unlocked_stage_ids.clear()
+	for index: int in range(mini(highest_unlocked_stage_index + 1, stages.size())):
+		var stage_id: String = _dictionary_string(stages[index], "id", "")
+		if not stage_id.is_empty():
+			unlocked_stage_ids.append(stage_id)
 
 
 func _load_build_info() -> void:
@@ -576,3 +708,16 @@ func _dictionary_string(data: Dictionary, key: String, fallback: String) -> Stri
 		@warning_ignore("unsafe_call_argument")
 		return String(value)
 	return fallback
+
+
+func _dictionary_string_array(data: Dictionary, key: String) -> Array[String]:
+	var result: Array[String] = []
+	var value: Variant = data.get(key, [])
+	if not value is Array:
+		return result
+	@warning_ignore("unsafe_cast")
+	var raw_values: Array = value as Array
+	for item: Variant in raw_values:
+		if item is String:
+			result.append(item)
+	return result

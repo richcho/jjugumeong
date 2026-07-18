@@ -6,7 +6,7 @@ const TEMP_PATH: String = "user://savegame.tmp.json"
 const WEB_STORAGE_KEY: String = "jjugumeong.save.v1"
 const WEB_COOKIE_KEY: String = "jjugumeong_save"
 const WEB_COOKIE_MAX_SIZE: int = 2500
-const CURRENT_SCHEMA_VERSION: int = 1
+const CURRENT_SCHEMA_VERSION: int = 2
 
 var last_load_used_backup: bool = false
 var last_load_was_recovered: bool = false
@@ -199,11 +199,16 @@ func _migrate_data(data: Dictionary, default_data: Dictionary) -> Dictionary:
 	var result: Dictionary = default_data.duplicate(true)
 	var schema_version: int = _dictionary_int(data, "schema_version", 0)
 
-	# Schema 0 was the pre-release shape. Its compatible keys can be copied as-is.
+	# Schema 0 was the pre-release shape. Compatible keys are copied as-is.
 	if schema_version <= CURRENT_SCHEMA_VERSION:
 		for key: Variant in result.keys():
 			if data.has(key):
 				result[key] = data[key]
+	if schema_version < 2:
+		result["selected_stage_index"] = _dictionary_int(data, "current_stage_index", 0)
+		result["unlocked_stage_ids"] = []
+		result["completed_region_event_ids"] = []
+		result["next_region_event_unix"] = 0
 	result["schema_version"] = CURRENT_SCHEMA_VERSION
 	return result
 

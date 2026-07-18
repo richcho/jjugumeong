@@ -58,7 +58,7 @@ GatheringMouse 귀환
 | 주 파일 | `user://savegame.json` |
 | 백업 | `user://savegame.backup.json` |
 | 임시 파일 | `user://savegame.tmp.json` |
-| 현재 스키마 | 1 |
+| 현재 스키마 | 2 |
 
 저장 순서:
 
@@ -83,6 +83,11 @@ Web에서는 `user://`의 IndexedDB 저장, `localStorage`, 소형 쿠키 백업
 화면 이탈, 앱 일시정지와 주요 강화 구매 때 즉시 저장하며, 파일 작성 뒤
 `JavaScriptBridge.force_fs_sync()`로 영구 파일 시스템 동기화를 요청합니다.
 정상 저장본 중 `last_saved_unix`가 최신인 데이터를 로드합니다.
+
+스키마 2는 `selected_stage_index`, `unlocked_stage_ids`,
+`completed_region_event_ids`, `next_region_event_unix`를 추가합니다. 스키마 1의
+`current_stage_index`는 선택 지역으로 이관하고, 해금 목록은 누적 치즈와 지역
+데이터에서 안전하게 재구성합니다.
 
 ## 5. 화면과 반응형 규칙
 

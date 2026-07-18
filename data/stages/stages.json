@@ -9,6 +9,15 @@
     "event": "냉장고 문이 열림",
     "world_events": ["냉장고 아래 비밀 통로 발견", "고양이 순찰 시간표 완성", "부엌 벽 너머에서 물소리 감지"],
     "daily_life": ["어린 쥐들이 빵가루 놀이 중", "공동 식탁에 저녁 치즈 준비", "노장 정찰쥐가 길을 가르치는 중"],
+    "choice_event": {
+      "id": "kitchen_cat_patrol",
+      "title": "고양이 순찰",
+      "description": "고양이가 냉장고 앞을 지나갑니다. 원정대의 길을 정해야 합니다.",
+      "choices": [
+        {"label": "숨은 통로로 우회", "result": "안전한 벽 틈으로 치즈를 넉넉히 옮겼습니다.", "effect": "secure", "reward_trips": 2},
+        {"label": "순찰 전에 질주", "result": "짧은 틈을 노려 치즈를 싣고 빠르게 돌아왔습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
+      ]
+    },
     "background_color": "#352a3b"
   },
   {
@@ -21,6 +30,15 @@
     "event": "대형 음식물 발견",
     "world_events": ["곡물 자루 속 숨은 방 발견", "쥐덫 해체 조가 안전 통로 확보", "창고 북쪽 환풍구에서 바람 감지"],
     "daily_life": ["저장 담당쥐가 겨울 식량 점검", "휴식조가 포대 침대를 손질 중", "새끼쥐들이 곡물 분류를 배우는 중"],
+    "choice_event": {
+      "id": "storage_mouse_trap",
+      "title": "선반 아래 쥐덫",
+      "description": "곡물 자루로 가는 길에 새 쥐덫이 놓였습니다.",
+      "choices": [
+        {"label": "끈을 풀어 안전 확보", "result": "해체조가 통로를 열고 곡물을 안전하게 회수했습니다.", "effect": "secure", "reward_trips": 2},
+        {"label": "상자 위로 빠르게 통과", "result": "높은 길을 달려 경계 구역을 벗어났습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
+      ]
+    },
     "background_color": "#26394a"
   },
   {
@@ -33,6 +51,15 @@
     "event": "야간 폐기 시간",
     "world_events": ["야간 폐기 시간 변경", "계산대 아래 동전 광장 발견", "골목 비둘기와 첫 교역 성사"],
     "daily_life": ["과자 봉지 음악회 준비 중", "정찰조가 편의점 지도를 갱신", "휴식조가 따뜻한 온장고 옆에 모임"],
+    "choice_event": {
+      "id": "store_human_cleanup",
+      "title": "야간 청소 시간",
+      "description": "인간의 청소 도구가 과자 진열대 쪽으로 다가옵니다.",
+      "choices": [
+        {"label": "계산대 아래에서 대기", "result": "소리가 멎은 뒤 남은 과자를 안전하게 모았습니다.", "effect": "secure", "reward_trips": 2},
+        {"label": "폐기 봉투를 먼저 선점", "result": "원정대가 봉투를 낚아채 빠른 귀환로를 열었습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
+      ]
+    },
     "background_color": "#243f39"
   },
   {
@@ -45,6 +72,15 @@
     "event": "빵 축제",
     "world_events": ["빵 축제 잔치가 시작됨", "주방 배수관으로 새 길 개통", "식당 고양이와 휴전 신호 발견"],
     "daily_life": ["요리쥐가 치즈 수프를 시험 중", "운반조가 교대식을 진행", "광장에 가족 식탁이 열림"],
+    "choice_event": {
+      "id": "restaurant_stove_heat",
+      "title": "뜨거워진 화로",
+      "description": "화로 열기가 통로를 막았지만 빵 바구니가 가까이 있습니다.",
+      "choices": [
+        {"label": "배수관 길로 우회", "result": "서늘한 통로에서 고급 치즈를 안전하게 운반했습니다.", "effect": "secure", "reward_trips": 2},
+        {"label": "열기가 약할 때 돌파", "result": "운반조가 순간을 노려 바구니를 빠르게 비웠습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
+      ]
+    },
     "background_color": "#4a302c"
   },
   {
@@ -57,6 +93,15 @@
     "event": "황금치즈 발견",
     "world_events": ["숙성고 지하에서 오래된 문 발견", "기계실 톱니길 안전화 완료", "다섯 지역 대표가 통로 회의를 소집"],
     "daily_life": ["기술쥐가 병뚜껑 수레를 수리 중", "야간조가 교대를 마치고 귀가", "치즈 광장에서 작은 시장이 열림"],
+    "choice_event": {
+      "id": "factory_conveyor",
+      "title": "움직이는 컨베이어",
+      "description": "숙성 치즈가 기계 안쪽으로 이동하고 있습니다.",
+      "choices": [
+        {"label": "정지 손잡이를 찾아 확보", "result": "기술쥐가 기계를 멈추고 치즈를 안정적으로 회수했습니다.", "effect": "secure", "reward_trips": 2},
+        {"label": "벨트 위에서 바로 운반", "result": "운반조가 벨트 속도를 이용해 빠르게 귀환했습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
+      ]
+    },
     "background_color": "#4b4025"
   }
 ]

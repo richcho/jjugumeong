@@ -16,5 +16,5 @@
 
 | 날짜 | 상세 | 유형 | 요약 | 상태 |
 | --- | --- | --- | --- | --- |
-| 2026-07-19 | [상세](changelog/20260719.md) | feat/refactor/test/docs | V0.2.6~0.2.7 시각 성장 티어, 다음 보상 API와 iPad Web 검증 준비 | 유지 |
+| 2026-07-19 | [상세](changelog/20260719.md) | feat/refactor/test/docs | V0.2 완료, V0.3.0 지역 재방문·선택 사건·스키마 2 | 유지 |
 | 2026-07-18 | [상세](changelog/20260718.md) | feat/fix/docs | V0.1 수직 슬라이스, iPad PWA, 한글 폰트, Safari 화면 보정, 프로젝트 문서 체계 정리 | 유지 |
