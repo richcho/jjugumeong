@@ -20,7 +20,7 @@
 | 황금치즈 | 10초, 보상 5배 | `GOLDEN_*` |
 | 황금치즈 발생 간격 | 35~65초 | `GOLDEN_EVENT_*` |
 | 클릭 부스트 | 3초, 속도 1.8배 | `CLICK_BOOST_*` |
-| 자동 저장 | 10초 | `AUTO_SAVE_INTERVAL` |
+| 자동 저장 | 3초 | `AUTO_SAVE_INTERVAL` |
 | 오프라인 상한 | 4시간 | `TimeManager` |
 | 예상 편도 거리 | 760 px | `ESTIMATED_ONE_WAY_DISTANCE` |
 

@@ -85,6 +85,7 @@ func _test_save_round_trip() -> void:
 	}
 	var saved: bool = SaveManager.save_game(payload)
 	_expect_true(saved, "save succeeds")
+	_expect_true(SaveManager.last_save_was_persistent, "native save is persistent")
 	var loaded: Dictionary = SaveManager.load_game(payload)
 	var loaded_cheese: Variant = loaded.get("cheese", -1.0)
 	if loaded_cheese is float:

@@ -120,7 +120,7 @@ html = html
   .replace(originalViewport, iPadViewport)
   .replace(originalBodyStyle, responsiveBodyStyle)
   .replace(originalCanvasStyle, responsiveCanvasStyle);
-writeFileSync(htmlPath, html);
+writeFileSync(htmlPath, `${html.trimEnd()}\n`);
 
 const workerPath = join(destination, "index.service.worker.js");
 let worker = readFileSync(workerPath, "utf8");
@@ -131,7 +131,7 @@ if (!worker.includes(originalCacheable)) {
   throw new Error("Godot service worker shape changed; gzip cache patch was not applied.");
 }
 worker = worker.replace(originalCacheable, compressedCacheable);
-writeFileSync(workerPath, worker);
+writeFileSync(workerPath, `${worker.trimEnd()}\n`);
 
 console.log(
   `Prepared iPad Web build: ${(wasm.length / 1024 / 1024).toFixed(1)} MiB WASM -> ` +

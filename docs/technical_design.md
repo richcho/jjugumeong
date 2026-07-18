@@ -76,6 +76,11 @@ GatheringMouse 귀환
 Web 세이브는 브라우저의 사이트 저장소에 의존합니다. 배포 주소 변경과 Safari
 사이트 데이터 삭제는 별도 저장 공간으로 취급합니다.
 
+Web에서는 `user://`의 IndexedDB 저장과 `localStorage` 백업을 함께 사용합니다.
+화면 이탈, 앱 일시정지와 주요 강화 구매 때 즉시 저장하며, 파일 작성 뒤
+`JavaScriptBridge.force_fs_sync()`로 영구 파일 시스템 동기화를 요청합니다.
+두 저장본 중 `last_saved_unix`가 최신인 정상 데이터를 로드합니다.
+
 ## 5. 화면과 반응형 규칙
 
 - 논리 기준 해상도: 1280×720

@@ -3,24 +3,34 @@ extends Node
 const SAVE_PATH: String = "user://savegame.json"
 const BACKUP_PATH: String = "user://savegame.backup.json"
 const TEMP_PATH: String = "user://savegame.tmp.json"
+const WEB_STORAGE_KEY: String = "jjugumeong.save.v1"
 const CURRENT_SCHEMA_VERSION: int = 1
 
 var last_load_used_backup: bool = false
 var last_load_was_recovered: bool = false
+var last_save_was_persistent: bool = true
 
 
 func load_game(default_data: Dictionary) -> Dictionary:
 	last_load_used_backup = false
 	last_load_was_recovered = false
 
-	var loaded_data: Dictionary = _read_and_validate(SAVE_PATH)
-	if not loaded_data.is_empty():
-		return _migrate_data(loaded_data, default_data)
+	var primary_data: Dictionary = _read_and_validate(SAVE_PATH)
+	var backup_data: Dictionary = _read_and_validate(BACKUP_PATH)
+	var web_data: Dictionary = _read_web_storage()
+	var loaded_data: Dictionary = primary_data
+	var loaded_source: String = "primary"
 
-	loaded_data = _read_and_validate(BACKUP_PATH)
+	if _is_newer_save(backup_data, loaded_data):
+		loaded_data = backup_data
+		loaded_source = "backup"
+	if _is_newer_save(web_data, loaded_data):
+		loaded_data = web_data
+		loaded_source = "web"
+
 	if not loaded_data.is_empty():
-		last_load_used_backup = true
-		last_load_was_recovered = true
+		last_load_used_backup = loaded_source == "backup"
+		last_load_was_recovered = loaded_source != "primary"
 		return _migrate_data(loaded_data, default_data)
 
 	if FileAccess.file_exists(SAVE_PATH) or FileAccess.file_exists(BACKUP_PATH):
@@ -32,9 +42,11 @@ func save_game(save_data: Dictionary) -> bool:
 	var payload: Dictionary = save_data.duplicate(true)
 	payload["schema_version"] = CURRENT_SCHEMA_VERSION
 	var json_text: String = JSON.stringify(payload, "\t")
+	var web_backup_saved: bool = _write_web_storage(json_text)
 
 	var temp_file: FileAccess = FileAccess.open(TEMP_PATH, FileAccess.WRITE)
 	if temp_file == null:
+		last_save_was_persistent = web_backup_saved
 		return false
 	temp_file.store_string(json_text)
 	temp_file.flush()
@@ -54,15 +66,25 @@ func save_game(save_data: Dictionary) -> bool:
 	if FileAccess.file_exists(SAVE_PATH):
 		var remove_error: Error = DirAccess.remove_absolute(save_absolute)
 		if remove_error != OK:
+			last_save_was_persistent = web_backup_saved
 			return false
 	var rename_error: Error = DirAccess.rename_absolute(temp_absolute, save_absolute)
-	return rename_error == OK
+	if OS.has_feature("web"):
+		JavaScriptBridge.force_fs_sync()
+		last_save_was_persistent = web_backup_saved or OS.is_userfs_persistent()
+	else:
+		last_save_was_persistent = rename_error == OK
+	return rename_error == OK or web_backup_saved
 
 
 func _read_and_validate(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {}
 	var text: String = _read_text(path)
+	return _parse_and_validate(text)
+
+
+func _parse_and_validate(text: String) -> Dictionary:
 	if text.is_empty():
 		return {}
 	var parsed: Variant = JSON.parse_string(text)
@@ -73,6 +95,50 @@ func _read_and_validate(path: String) -> Dictionary:
 	if not _has_valid_core_types(data):
 		return {}
 	return data
+
+
+func _read_web_storage() -> Dictionary:
+	if not OS.has_feature("web"):
+		return {}
+	var key_literal: String = JSON.stringify(WEB_STORAGE_KEY)
+	var stored_value: Variant = JavaScriptBridge.eval(
+		(
+			"(function(){try{return localStorage.getItem(%s) || '';}"
+			+ "catch(error){return '';}})()"
+		) % key_literal,
+		true
+	)
+	if not stored_value is String:
+		return {}
+	@warning_ignore("unsafe_cast")
+	return _parse_and_validate(stored_value as String)
+
+
+func _write_web_storage(json_text: String) -> bool:
+	if not OS.has_feature("web"):
+		return true
+	var key_literal: String = JSON.stringify(WEB_STORAGE_KEY)
+	var value_literal: String = JSON.stringify(json_text)
+	var saved: Variant = JavaScriptBridge.eval(
+		(
+			"(function(){try{localStorage.setItem(%s,%s);"
+			+ "return localStorage.getItem(%s) === %s;}"
+			+ "catch(error){return false;}})()"
+		) % [key_literal, value_literal, key_literal, value_literal],
+		true
+	)
+	return saved is bool and saved
+
+
+func _is_newer_save(candidate: Dictionary, current: Dictionary) -> bool:
+	if candidate.is_empty():
+		return false
+	if current.is_empty():
+		return true
+	return (
+		_dictionary_int(candidate, "last_saved_unix", 0)
+		> _dictionary_int(current, "last_saved_unix", 0)
+	)
 
 
 func _read_text(path: String) -> String:

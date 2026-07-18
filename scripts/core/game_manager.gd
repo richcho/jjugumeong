@@ -1,7 +1,7 @@
 extends Node
 
 const STAGES_PATH: String = "res://data/stages/stages.json"
-const AUTO_SAVE_INTERVAL: float = 10.0
+const AUTO_SAVE_INTERVAL: float = 3.0
 const BASE_SPEED: float = 150.0
 const SPEED_PER_LEVEL: float = 22.5
 const BASE_CARRY: int = 1
@@ -43,6 +43,7 @@ func _ready() -> void:
 	_calculate_offline_reward()
 	_next_golden_event = randf_range(GOLDEN_EVENT_MIN_DELAY, GOLDEN_EVENT_MAX_DELAY)
 	_is_ready = true
+	save_now()
 	if SaveManager.last_load_was_recovered:
 		EventBus.save_status_changed.emit("저장 복구됨")
 	else:
@@ -75,7 +76,10 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		save_now()
 		get_tree().quit()
-	elif what == NOTIFICATION_APPLICATION_PAUSED:
+	elif (
+		what == NOTIFICATION_APPLICATION_PAUSED
+		or what == NOTIFICATION_APPLICATION_FOCUS_OUT
+	):
 		save_now()
 
 
@@ -99,6 +103,7 @@ func buy_speed_upgrade() -> bool:
 	speed_level += 1
 	EventBus.toast_requested.emit("이동속도가 빨라졌습니다!")
 	EventBus.game_state_changed.emit()
+	save_now()
 	return true
 
 
@@ -109,6 +114,7 @@ func buy_carry_upgrade() -> bool:
 	carry_level += 1
 	EventBus.toast_requested.emit("운반량이 증가했습니다!")
 	EventBus.game_state_changed.emit()
+	save_now()
 	return true
 
 
@@ -120,6 +126,7 @@ func buy_mouse() -> bool:
 	EventBus.mouse_count_changed.emit(mouse_count)
 	EventBus.toast_requested.emit("새로운 집쥐가 합류했습니다!")
 	EventBus.game_state_changed.emit()
+	save_now()
 	return true
 
 
@@ -130,6 +137,7 @@ func expand_hole() -> bool:
 	hole_level += 1
 	EventBus.toast_requested.emit("쥐구멍이 %d레벨로 확장됐습니다!" % hole_level)
 	EventBus.game_state_changed.emit()
+	save_now()
 	return true
 
 
@@ -166,7 +174,10 @@ func save_now() -> bool:
 	EventBus.save_status_changed.emit("저장 중...")
 	var success: bool = SaveManager.save_game(_build_save_data())
 	if success:
-		EventBus.save_status_changed.emit("저장됨")
+		if SaveManager.last_save_was_persistent:
+			EventBus.save_status_changed.emit("저장됨")
+		else:
+			EventBus.save_status_changed.emit("Safari 저장 제한")
 	else:
 		EventBus.save_status_changed.emit("저장 실패")
 	return success
