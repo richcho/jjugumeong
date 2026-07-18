@@ -2,14 +2,16 @@ extends Node
 
 const STAGES_PATH: String = "res://data/stages/stages.json"
 const AUTO_SAVE_INTERVAL: float = 3.0
-const BASE_SPEED: float = 150.0
-const SPEED_PER_LEVEL: float = 22.5
+const BASE_SPEED: float = 115.0
+const SPEED_LEVEL_CURVE: float = 32.0
+const MAX_MOVE_SPEED: float = 245.0
+const MAX_BOOSTED_MOVE_SPEED: float = 285.0
 const BASE_CARRY: int = 1
 const ALPHA_TEST_REWARD_MULTIPLIER: float = 25.0
 const GOLDEN_DURATION: float = 10.0
 const GOLDEN_MULTIPLIER: float = 5.0
 const CLICK_BOOST_DURATION: float = 3.0
-const CLICK_BOOST_MULTIPLIER: float = 1.8
+const CLICK_BOOST_MULTIPLIER: float = 1.25
 const GOLDEN_EVENT_MIN_DELAY: float = 35.0
 const GOLDEN_EVENT_MAX_DELAY: float = 65.0
 const ESTIMATED_ONE_WAY_DISTANCE: float = 760.0
@@ -189,9 +191,12 @@ func save_now() -> bool:
 
 
 func get_move_speed() -> float:
-	var speed: float = BASE_SPEED + float(speed_level) * SPEED_PER_LEVEL
+	var speed: float = minf(
+		BASE_SPEED + sqrt(float(speed_level)) * SPEED_LEVEL_CURVE,
+		MAX_MOVE_SPEED
+	)
 	if click_boost_remaining > 0.0:
-		speed *= CLICK_BOOST_MULTIPLIER
+		speed = minf(speed * CLICK_BOOST_MULTIPLIER, MAX_BOOSTED_MOVE_SPEED)
 	return speed
 
 

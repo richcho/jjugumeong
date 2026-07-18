@@ -10,6 +10,7 @@ func _ready() -> void:
 func _run_tests() -> void:
 	_test_time_cap()
 	_test_upgrade_costs()
+	_test_natural_speed_curve()
 	_test_golden_reward()
 	_test_colony_progression()
 	_test_reward_text_bounds()
@@ -47,6 +48,25 @@ func _test_upgrade_costs() -> void:
 	_expect_equal_int(GameManager.get_hole_upgrade_cost(), 100, "base hole cost")
 	GameManager.speed_level = 1
 	_expect_equal_int(GameManager.get_speed_upgrade_cost(), 15, "scaled speed cost")
+
+
+func _test_natural_speed_curve() -> void:
+	var previous_speed_level: int = GameManager.speed_level
+	var previous_boost_remaining: float = GameManager.click_boost_remaining
+	GameManager.click_boost_remaining = 0.0
+	GameManager.speed_level = 0
+	var base_speed: float = GameManager.get_move_speed()
+	GameManager.speed_level = 1
+	var first_upgrade_speed: float = GameManager.get_move_speed()
+	GameManager.speed_level = 100
+	var capped_speed: float = GameManager.get_move_speed()
+	GameManager.click_boost_remaining = 1.0
+	var boosted_speed: float = GameManager.get_move_speed()
+	_expect_true(first_upgrade_speed > base_speed, "first speed upgrade has effect")
+	_expect_true(capped_speed <= 245.0, "normal movement speed cap")
+	_expect_true(boosted_speed <= 285.0, "boosted movement speed cap")
+	GameManager.speed_level = previous_speed_level
+	GameManager.click_boost_remaining = previous_boost_remaining
 
 
 func _test_golden_reward() -> void:

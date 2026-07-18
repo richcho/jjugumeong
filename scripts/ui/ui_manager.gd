@@ -626,7 +626,7 @@ func _on_golden_changed(active: bool, remaining: float) -> void:
 
 func _on_boost_changed(active: bool, remaining: float) -> void:
 	if active:
-		boost_label.text = "속도 부스트 %.1f초 · 1.8배" % remaining
+		boost_label.text = "속도 부스트 %.1f초 · 자연 가속" % remaining
 	else:
 		boost_label.text = "이동 구역 클릭: 3초 속도 부스트"
 
