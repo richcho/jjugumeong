@@ -78,8 +78,15 @@ func _test_reward_text_bounds() -> void:
 		120.0,
 		Vector2(1024.0, 768.0)
 	)
+	var portrait_value: Variant = world_view.call(
+		"_clamp_reward_position",
+		Vector2(-100.0, -100.0),
+		160.0,
+		Vector2(768.0, 1024.0)
+	)
 	_expect_true(upper_left_value is Vector2, "reward upper-left position type")
 	_expect_true(lower_right_value is Vector2, "reward lower-right position type")
+	_expect_true(portrait_value is Vector2, "reward portrait position type")
 	if upper_left_value is Vector2 and lower_right_value is Vector2:
 		@warning_ignore("unsafe_cast")
 		var upper_left: Vector2 = upper_left_value as Vector2
@@ -88,6 +95,10 @@ func _test_reward_text_bounds() -> void:
 		_expect_true(upper_left.x >= 24.0 and upper_left.y >= 165.0, "reward upper-left bounds")
 		_expect_true(lower_right.x <= 880.0, "reward right bound")
 		_expect_true(lower_right.y <= 563.0, "reward bottom bound")
+	if portrait_value is Vector2:
+		@warning_ignore("unsafe_cast")
+		var portrait_position: Vector2 = portrait_value as Vector2
+		_expect_true(portrait_position.y >= 450.0, "portrait reward clears text panels")
 	world_view.free()
 
 
@@ -205,6 +216,20 @@ func _test_ui_layout() -> void:
 		game_ui.next_reward_panel.position.x + game_ui.next_reward_panel.size.x <= host.size.x,
 		"portrait reward card right bound"
 	)
+	_expect_true(
+		game_ui.next_reward_panel.position.x >= 0.0,
+		"portrait reward card left bound"
+	)
+	game_ui.call("_on_golden_changed", true, 9.9)
+	game_ui.call("_show_toast", "황금치즈 발견! 10초간 보상 5배!")
+	await get_tree().process_frame
+	var golden_rect: Rect2 = game_ui.golden_label.get_global_rect()
+	var toast_rect: Rect2 = game_ui.toast_label.get_global_rect()
+	var reward_rect: Rect2 = game_ui.next_reward_panel.get_global_rect()
+	_expect_true(golden_rect.end.x <= host.size.x, "portrait golden text right bound")
+	_expect_true(toast_rect.position.x >= 0.0, "portrait toast left bound")
+	_expect_true(toast_rect.end.x <= host.size.x, "portrait toast right bound")
+	_expect_true(toast_rect.position.y >= reward_rect.end.y, "toast clears reward card")
 	host.queue_free()
 	await get_tree().process_frame
 

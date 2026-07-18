@@ -24,6 +24,8 @@ var carry_button: Button
 var mouse_button: Button
 var hole_button: Button
 var button_grid: GridContainer
+var info_grid: GridContainer
+var event_grid: GridContainer
 var top_panel: PanelContainer
 var bottom_panel: PanelContainer
 
@@ -95,39 +97,49 @@ func _build_interface() -> void:
 	var title_row: HBoxContainer = HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 14)
 	top_vbox.add_child(title_row)
-	title_label = _make_label("쥐구멍  ALPHA 0.2.1", 25, Color("#ffd969"))
+	title_label = _make_label("쥐구멍  ALPHA 0.2.2", 25, Color("#ffd969"))
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title_label)
 	save_label = _make_label("불러오는 중...", 14, Color("#afc9bd"))
 	save_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	title_row.add_child(save_label)
 
-	var info_row: HBoxContainer = HBoxContainer.new()
-	info_row.add_theme_constant_override("separation", 22)
-	top_vbox.add_child(info_row)
+	info_grid = GridContainer.new()
+	info_grid.columns = 4
+	info_grid.add_theme_constant_override("h_separation", 16)
+	info_grid.add_theme_constant_override("v_separation", 3)
+	top_vbox.add_child(info_grid)
 	stage_label = _make_info_label()
 	cheese_label = _make_info_label()
 	production_label = _make_info_label()
 	mouse_label = _make_info_label()
 	for label: Label in [stage_label, cheese_label, production_label, mouse_label]:
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		info_row.add_child(label)
+		label.clip_text = true
+		label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		info_grid.add_child(label)
 
-	var event_row: HBoxContainer = HBoxContainer.new()
-	event_row.add_theme_constant_override("separation", 18)
-	top_vbox.add_child(event_row)
+	event_grid = GridContainer.new()
+	event_grid.columns = 3
+	event_grid.add_theme_constant_override("h_separation", 14)
+	event_grid.add_theme_constant_override("v_separation", 3)
+	top_vbox.add_child(event_grid)
 	golden_label = _make_label("", 14, Color("#ffe384"))
 	golden_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	golden_label.clip_text = true
 	golden_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	event_row.add_child(golden_label)
+	event_grid.add_child(golden_label)
 	boost_label = _make_label("이동 구역 클릭: 속도 부스트", 14, Color("#9edbff"))
 	boost_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	event_row.add_child(boost_label)
+	boost_label.clip_text = true
+	boost_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	event_grid.add_child(boost_label)
 	next_stage_label = _make_label("", 14, Color("#d6c8e8"))
 	next_stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	next_stage_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	event_row.add_child(next_stage_label)
+	next_stage_label.clip_text = true
+	next_stage_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	event_grid.add_child(next_stage_label)
 
 	bottom_panel = PanelContainer.new()
 	bottom_panel.name = "BottomPanel"
@@ -165,6 +177,8 @@ func _build_interface() -> void:
 	toast_label = _make_label("", 20, Color("#fff4d4"))
 	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	toast_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	toast_label.clip_text = true
 	toast_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	toast_label.add_theme_stylebox_override("normal", _make_panel_style(Color(0.08, 0.06, 0.09, 0.92), 10))
 	toast_label.hide()
@@ -224,9 +238,11 @@ func _build_discovery_panel() -> void:
 	margin.add_child(content)
 	discovery_title = _make_label("", 27, Color("#ffd969"))
 	discovery_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	discovery_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(discovery_title)
 	discovery_detail = _make_label("", 17, Color("#f3e9d5"))
 	discovery_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	discovery_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(discovery_detail)
 
 
@@ -362,25 +378,40 @@ func _update_responsive_layout() -> void:
 	top_panel.offset_left = side_margin
 	top_panel.offset_top = 18.0
 	top_panel.offset_right = -side_margin
-	top_panel.offset_bottom = 137.0 if not compact_layout else 158.0
+	top_panel.offset_bottom = 137.0 if not compact_layout else 218.0
+	info_grid.columns = 4 if not compact_layout else 2
+	event_grid.columns = 3 if not compact_layout else 1
+	for event_label: Label in [golden_label, boost_label, next_stage_label]:
+		event_label.horizontal_alignment = (
+			HORIZONTAL_ALIGNMENT_LEFT
+			if compact_layout
+			else HORIZONTAL_ALIGNMENT_CENTER
+		)
 	bottom_panel.set_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom_panel.offset_left = side_margin
 	bottom_panel.offset_right = -side_margin
 	bottom_panel.offset_top = -158.0 if not compact_layout else -228.0
 	bottom_panel.offset_bottom = -18.0
 	button_grid.columns = 4 if not compact_layout else 2
-	next_reward_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	next_reward_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	var reward_width: float = minf(380.0, viewport_size.x - side_margin * 2.0)
 	next_reward_panel.position = Vector2(
-		-reward_width - side_margin,
+		viewport_size.x - reward_width - side_margin,
 		top_panel.offset_bottom + 12.0
 	)
-	next_reward_panel.size = Vector2(reward_width, 98.0)
+	var reward_height: float = maxf(
+		98.0,
+		next_reward_panel.get_combined_minimum_size().y
+	)
+	next_reward_panel.size = Vector2(reward_width, reward_height)
 
-	toast_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	toast_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	var toast_width: float = minf(420.0, viewport_size.x - side_margin * 2.0)
-	toast_label.position = Vector2(-toast_width * 0.5, top_panel.offset_bottom + 18.0)
-	toast_label.size = Vector2(toast_width, 54.0)
+	toast_label.position = Vector2(
+		(viewport_size.x - toast_width) * 0.5,
+		next_reward_panel.position.y + reward_height + 14.0
+	)
+	toast_label.size = Vector2(toast_width, 68.0 if compact_layout else 54.0)
 	_place_modal(stats_panel, Vector2(430.0, 380.0))
 	_place_modal(tutorial_panel, Vector2(480.0, 280.0))
 	_place_modal(offline_panel, Vector2(480.0, 260.0))
@@ -392,8 +423,8 @@ func _place_modal(panel: Control, desired_size: Vector2) -> void:
 		minf(desired_size.x, maxf(280.0, size.x - 32.0)),
 		minf(desired_size.y, maxf(220.0, size.y - 32.0))
 	)
-	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.position = -actual_size * 0.5
+	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	panel.position = (size - actual_size) * 0.5
 	panel.size = actual_size
 
 
@@ -568,7 +599,7 @@ func _on_stage_changed(_stage_index: int) -> void:
 
 func _on_golden_changed(active: bool, remaining: float) -> void:
 	if active:
-		golden_label.text = "황금치즈 %.1f초 · 5배" % remaining
+		golden_label.text = "황금치즈  %.1f초  ·  보상 5배" % remaining
 	else:
 		golden_label.text = "ALPHA 보상 25배"
 

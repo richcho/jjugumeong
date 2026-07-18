@@ -94,7 +94,7 @@ func _draw() -> void:
 		var effect_position: Vector2 = _dictionary_vector2(effect, "position", Vector2.ZERO)
 		var amount: int = _dictionary_int(effect, "amount", 0)
 		var alpha: float = clampf(_dictionary_float(effect, "remaining", 0.0), 0.0, 1.0)
-		var reward_text: String = "+%d 치즈" % amount
+		var reward_text: String = "+%s 치즈" % _format_reward_amount(amount)
 		var text_width: float = GAME_FONT.get_string_size(
 			reward_text,
 			HORIZONTAL_ALIGNMENT_LEFT,
@@ -374,18 +374,32 @@ func _clamp_reward_position(
 	text_width: float,
 	viewport_size: Vector2
 ) -> Vector2:
+	var compact_layout: bool = viewport_size.x < 1000.0
+	var safe_top: float = 450.0 if compact_layout else 350.0
+	var safe_bottom: float = 245.0 if compact_layout else REWARD_BOTTOM_MARGIN
 	var maximum_x: float = maxf(
 		REWARD_SIDE_MARGIN,
 		viewport_size.x - text_width - REWARD_SIDE_MARGIN
 	)
 	var maximum_y: float = maxf(
-		REWARD_TOP_MARGIN,
-		viewport_size.y - REWARD_BOTTOM_MARGIN
+		safe_top,
+		viewport_size.y - safe_bottom
 	)
 	return Vector2(
 		clampf(position_value.x, REWARD_SIDE_MARGIN, maximum_x),
-		clampf(position_value.y, REWARD_TOP_MARGIN, maximum_y)
+		clampf(position_value.y, safe_top, maximum_y)
 	)
+
+
+func _format_reward_amount(amount: int) -> String:
+	var absolute_amount: int = absi(amount)
+	if absolute_amount >= 1_000_000_000:
+		return "%.2fB" % (float(amount) / 1_000_000_000.0)
+	if absolute_amount >= 1_000_000:
+		return "%.2fM" % (float(amount) / 1_000_000.0)
+	if absolute_amount >= 1_000:
+		return "%.2fK" % (float(amount) / 1_000.0)
+	return "%d" % amount
 
 
 func _dictionary_float(data: Dictionary, key: String, fallback: float) -> float:
