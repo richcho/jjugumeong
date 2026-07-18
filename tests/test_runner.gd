@@ -13,6 +13,8 @@ func _run_tests() -> void:
 	_test_golden_reward()
 	_test_reward_text_bounds()
 	_test_stage_backgrounds()
+	_test_background_anchor_alignment()
+	_test_mouse_sprites()
 	_test_korean_font()
 	_test_save_round_trip()
 	await _test_ui_layout()
@@ -111,6 +113,45 @@ func _test_stage_backgrounds() -> void:
 	]:
 		var background: Texture2D = load(path) as Texture2D
 		_expect_true(background != null, "stage background loads: %s" % path)
+
+
+func _test_mouse_sprites() -> void:
+	for path: String in [
+		"res://assets/mouse/sprites/field_mouse-v2.png",
+		"res://assets/mouse/sprites/field_mouse_carrying-v2.png"
+	]:
+		var mouse_texture: Texture2D = load(path) as Texture2D
+		_expect_true(mouse_texture != null, "mouse sprite loads: %s" % path)
+
+
+func _test_background_anchor_alignment() -> void:
+	var world_view: WorldView = WorldView.new()
+	var background: Texture2D = load(
+		"res://assets/background/stages/old_kitchen.jpg"
+	) as Texture2D
+	var landscape_value: Variant = world_view.call(
+		"_background_point_to_viewport",
+		Vector2(205.0, 456.0),
+		background,
+		Vector2(1280.0, 720.0)
+	)
+	var ipad_value: Variant = world_view.call(
+		"_background_point_to_viewport",
+		Vector2(205.0, 456.0),
+		background,
+		Vector2(1024.0, 768.0)
+	)
+	_expect_true(landscape_value is Vector2, "landscape background anchor type")
+	_expect_true(ipad_value is Vector2, "iPad background anchor type")
+	if landscape_value is Vector2 and ipad_value is Vector2:
+		@warning_ignore("unsafe_cast")
+		var landscape_position: Vector2 = landscape_value as Vector2
+		@warning_ignore("unsafe_cast")
+		var ipad_position: Vector2 = ipad_value as Vector2
+		_expect_true(landscape_position.y > 400.0, "landscape mouse stays on floor")
+		_expect_true(ipad_position.y > 450.0, "iPad mouse stays on floor")
+		_expect_true(ipad_position.x >= 44.0, "iPad cropped hole stays visible")
+	world_view.free()
 
 
 func _test_save_round_trip() -> void:

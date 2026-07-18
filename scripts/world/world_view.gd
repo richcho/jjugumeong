@@ -3,12 +3,27 @@ extends Node2D
 
 const MOUSE_SCENE: PackedScene = preload("res://scenes/mouse/mouse.tscn")
 const GAME_FONT: FontFile = preload("res://assets/fonts/NotoSansKR-Subset.ttf")
+const RESIDENT_MOUSE_TEXTURE: Texture2D = preload("res://assets/mouse/sprites/field_mouse-v2.png")
 const STAGE_BACKGROUNDS: Array[Texture2D] = [
 	preload("res://assets/background/stages/old_kitchen.jpg"),
 	preload("res://assets/background/stages/food_storage.jpg"),
 	preload("res://assets/background/stages/convenience_store.jpg"),
 	preload("res://assets/background/stages/restaurant.jpg"),
 	preload("res://assets/background/stages/cheese_factory.jpg")
+]
+const STAGE_HOLE_ANCHORS: Array[Vector2] = [
+	Vector2(205.0, 456.0),
+	Vector2(120.0, 500.0),
+	Vector2(205.0, 495.0),
+	Vector2(155.0, 495.0),
+	Vector2(175.0, 470.0)
+]
+const STAGE_RESOURCE_ANCHORS: Array[Vector2] = [
+	Vector2(1110.0, 470.0),
+	Vector2(1115.0, 475.0),
+	Vector2(1100.0, 490.0),
+	Vector2(1110.0, 485.0),
+	Vector2(1080.0, 475.0)
 ]
 const MAX_LANE_ROWS: int = 7
 const REWARD_FONT_SIZE: int = 22
@@ -101,18 +116,7 @@ func _draw() -> void:
 func _draw_stage_background(viewport_size: Vector2) -> void:
 	if GameManager.current_stage_index < STAGE_BACKGROUNDS.size():
 		var background: Texture2D = STAGE_BACKGROUNDS[GameManager.current_stage_index]
-		var texture_size: Vector2 = background.get_size()
-		var source_rect: Rect2 = Rect2(Vector2.ZERO, texture_size)
-		var viewport_aspect: float = viewport_size.x / maxf(1.0, viewport_size.y)
-		var texture_aspect: float = texture_size.x / maxf(1.0, texture_size.y)
-		if viewport_aspect > texture_aspect:
-			var source_height: float = texture_size.x / viewport_aspect
-			source_rect.position.y = (texture_size.y - source_height) * 0.5
-			source_rect.size.y = source_height
-		else:
-			var source_width: float = texture_size.y * viewport_aspect
-			source_rect.position.x = (texture_size.x - source_width) * 0.5
-			source_rect.size.x = source_width
+		var source_rect: Rect2 = _get_background_source_rect(background, viewport_size)
 		draw_texture_rect_region(
 			background,
 			Rect2(Vector2.ZERO, viewport_size),
@@ -149,6 +153,9 @@ func _draw_atmosphere(viewport_size: Vector2) -> void:
 
 
 func _draw_mouse_hole() -> void:
+	if GameManager.current_stage_index < STAGE_BACKGROUNDS.size():
+		_draw_embedded_hole_progress()
+		return
 	var hole_scale: float = 1.0 + minf(float(GameManager.hole_level - 1) * 0.07, 0.55)
 	draw_circle(hole_position + Vector2(0.0, 10.0), 62.0 * hole_scale, Color(0.07, 0.04, 0.08, 0.78))
 	draw_circle(hole_position + Vector2(0.0, 12.0), 43.0 * hole_scale, Color(0.02, 0.015, 0.025, 0.9))
@@ -174,7 +181,29 @@ func _draw_mouse_hole() -> void:
 	)
 
 
+func _draw_embedded_hole_progress() -> void:
+	var pulse: float = 0.5 + sin(float(Time.get_ticks_msec()) * 0.004) * 0.12
+	draw_circle(hole_position, 45.0, Color(1.0, 0.63, 0.2, 0.05 + pulse * 0.05))
+	draw_arc(hole_position, 39.0, 0.15, PI - 0.15, 28, Color(1.0, 0.77, 0.36, 0.52), 3.0, true)
+	if GameManager.hole_level >= 2:
+		draw_line(hole_position + Vector2(-30.0, 20.0), hole_position + Vector2(-30.0, -20.0), Color("#b7834e"), 5.0, true)
+		draw_line(hole_position + Vector2(30.0, 20.0), hole_position + Vector2(30.0, -20.0), Color("#b7834e"), 5.0, true)
+	if GameManager.hole_level >= 3:
+		for item_index: int in range(3):
+			draw_circle(hole_position + Vector2(-18.0 + float(item_index) * 18.0, 28.0), 4.0, Color("#f0bd45"))
+	if GameManager.hole_level >= 4:
+		draw_circle(hole_position + Vector2(0.0, -42.0), 7.0, Color(1.0, 0.75, 0.28, pulse))
+
+
 func _draw_cheese_resource() -> void:
+	if GameManager.current_stage_index < STAGE_BACKGROUNDS.size():
+		var glow_color: Color = Color(1.0, 0.76, 0.18, 0.14)
+		if GameManager.golden_remaining > 0.0:
+			glow_color = Color(1.0, 0.9, 0.32, 0.32)
+		var glow_radius: float = 34.0 + sin(float(Time.get_ticks_msec()) * 0.008) * 4.0
+		draw_circle(resource_position, glow_radius, glow_color)
+		draw_arc(resource_position, glow_radius, 0.0, TAU, 28, Color(1.0, 0.88, 0.42, 0.55), 3.0, true)
+		return
 	var cheese_color: Color = Color("#ffd35a")
 	if GameManager.golden_remaining > 0.0:
 		cheese_color = Color("#fff09b")
@@ -217,11 +246,11 @@ func _draw_resident_mice() -> void:
 
 func _draw_resident_mouse(resident_position: Vector2, resident_index: int) -> void:
 	draw_set_transform(resident_position)
-	var body_color: Color = Color("#7f8993") if resident_index % 2 == 0 else Color("#a58c7a")
-	draw_circle(Vector2.ZERO, 9.0, Color("#2d2931"))
-	draw_circle(Vector2.ZERO, 7.0, body_color)
-	draw_circle(Vector2(-4.0, -6.0), 3.2, Color("#d39ca6"))
-	draw_circle(Vector2(5.0, -1.0), 1.8, Color("#e5bcc2"))
+	draw_texture_rect(
+		RESIDENT_MOUSE_TEXTURE,
+		Rect2(Vector2(-18.0, -24.0), Vector2(36.0, 24.0)),
+		false
+	)
 	if resident_index % 3 == 0:
 		draw_circle(Vector2(13.0, 4.0), 4.0, Color("#f0bd45"))
 		draw_line(Vector2(8.0, 2.0), Vector2(12.0, 3.0), Color("#e7d8bf"), 2.0, true)
@@ -235,9 +264,22 @@ func _draw_resident_mouse(resident_position: Vector2, resident_index: int) -> vo
 
 func _update_layout() -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
-	var vertical_center: float = clampf(viewport_size.y * 0.49, 210.0, viewport_size.y - 190.0)
-	hole_position = Vector2(maxf(110.0, viewport_size.x * 0.13), vertical_center)
-	resource_position = Vector2(minf(viewport_size.x - 110.0, viewport_size.x * 0.87), vertical_center)
+	if GameManager.current_stage_index < STAGE_BACKGROUNDS.size():
+		var background: Texture2D = STAGE_BACKGROUNDS[GameManager.current_stage_index]
+		hole_position = _background_point_to_viewport(
+			STAGE_HOLE_ANCHORS[GameManager.current_stage_index],
+			background,
+			viewport_size
+		)
+		resource_position = _background_point_to_viewport(
+			STAGE_RESOURCE_ANCHORS[GameManager.current_stage_index],
+			background,
+			viewport_size
+		)
+	else:
+		var vertical_center: float = clampf(viewport_size.y * 0.68, 260.0, viewport_size.y - 190.0)
+		hole_position = Vector2(maxf(90.0, viewport_size.x * 0.13), vertical_center)
+		resource_position = Vector2(minf(viewport_size.x - 90.0, viewport_size.x * 0.87), vertical_center)
 	for mouse_node: GatheringMouse in _mouse_nodes:
 		mouse_node.update_route(hole_position, resource_position)
 	queue_redraw()
@@ -253,7 +295,7 @@ func _rebuild_mice(count: int) -> void:
 		var mouse_node: GatheringMouse = instance as GatheringMouse
 		add_child(mouse_node)
 		var lane_row: int = index % MAX_LANE_ROWS
-		var lane_offset: float = float(lane_row - MAX_LANE_ROWS / 2) * 17.0
+		var lane_offset: float = float(lane_row - MAX_LANE_ROWS / 2) * 10.0
 		var progress_offset: float = float(index / MAX_LANE_ROWS) * 32.0
 		mouse_node.configure(
 			hole_position + Vector2(progress_offset, 0.0),
@@ -283,6 +325,7 @@ func _on_stage_changed(_stage_index: int) -> void:
 		_dictionary_string(stage, "background_color", "#352a3b"),
 		Color("#352a3b")
 	)
+	_update_layout()
 	queue_redraw()
 
 
@@ -292,6 +335,38 @@ func _on_golden_cheese_changed(_active: bool, _remaining: float) -> void:
 
 func _on_viewport_size_changed() -> void:
 	_update_layout()
+
+
+func _get_background_source_rect(background: Texture2D, viewport_size: Vector2) -> Rect2:
+	var texture_size: Vector2 = background.get_size()
+	var source_rect: Rect2 = Rect2(Vector2.ZERO, texture_size)
+	var viewport_aspect: float = viewport_size.x / maxf(1.0, viewport_size.y)
+	var texture_aspect: float = texture_size.x / maxf(1.0, texture_size.y)
+	if viewport_aspect > texture_aspect:
+		var source_height: float = texture_size.x / viewport_aspect
+		source_rect.position.y = (texture_size.y - source_height) * 0.5
+		source_rect.size.y = source_height
+	else:
+		var source_width: float = texture_size.y * viewport_aspect
+		source_rect.position.x = (texture_size.x - source_width) * 0.5
+		source_rect.size.x = source_width
+	return source_rect
+
+
+func _background_point_to_viewport(
+	texture_point: Vector2,
+	background: Texture2D,
+	viewport_size: Vector2
+) -> Vector2:
+	var source_rect: Rect2 = _get_background_source_rect(background, viewport_size)
+	var normalized_point: Vector2 = Vector2(
+		(texture_point.x - source_rect.position.x) / source_rect.size.x,
+		(texture_point.y - source_rect.position.y) / source_rect.size.y
+	)
+	return Vector2(
+		clampf(normalized_point.x * viewport_size.x, 44.0, viewport_size.x - 44.0),
+		clampf(normalized_point.y * viewport_size.y, 185.0, viewport_size.y - 165.0)
+	)
 
 
 func _clamp_reward_position(

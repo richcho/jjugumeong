@@ -3,6 +3,11 @@ extends Node2D
 
 signal reward_delivered(world_position: Vector2, amount: int)
 
+const MOUSE_TEXTURE: Texture2D = preload("res://assets/mouse/sprites/field_mouse-v2.png")
+const CARRYING_TEXTURE: Texture2D = preload(
+	"res://assets/mouse/sprites/field_mouse_carrying-v2.png"
+)
+
 var hole_position: Vector2 = Vector2.ZERO
 var resource_position: Vector2 = Vector2.ZERO
 var lane_offset: float = 0.0
@@ -55,32 +60,15 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	var bob_offset: float = sin(
 		float(Time.get_ticks_msec()) * 0.012 + float(visual_index) * 1.7
-	) * 2.0
+	) * 1.25
 	draw_set_transform(Vector2(0.0, bob_offset))
-	var body_color: Color = Color("#9aa0a8")
-	var ear_color: Color = Color("#d9a7b0")
-	var outline_color: Color = Color("#34313a")
-	draw_circle(Vector2.ZERO, 15.0, outline_color)
-	draw_circle(Vector2.ZERO, 12.5, body_color)
-	draw_circle(Vector2(-7.0, -10.0), 6.0, outline_color)
-	draw_circle(Vector2(-7.0, -10.0), 4.2, ear_color)
-	draw_circle(Vector2(9.0, -1.0), 3.0, Color("#e5bcc2"))
-	draw_circle(Vector2(5.0, -6.0), 2.0, Color("#17141a"))
-	draw_arc(Vector2(-12.0, 4.0), 13.0, 1.4, 3.3, 14, Color("#d9a7b0"), 2.0, true)
-	draw_circle(Vector2(-5.0, 11.0), 3.0, Color("#56515b"))
-	draw_circle(Vector2(6.0, 11.0), 3.0, Color("#56515b"))
+	var active_texture: Texture2D = CARRYING_TEXTURE if carrying else MOUSE_TEXTURE
+	draw_texture_rect(active_texture, Rect2(Vector2(-39.0, -53.0), Vector2(78.0, 53.0)), false)
 	if GameManager.speed_level >= 1:
-		draw_line(Vector2(-9.0, -3.0), Vector2(-19.0, 5.0), Color("#e45f6f"), 4.0, true)
-		draw_line(Vector2(-17.0, 5.0), Vector2(-25.0, 1.0), Color("#f28b78"), 3.0, true)
+		draw_line(Vector2(-4.0, -28.0), Vector2(-19.0, -19.0), Color("#e45f6f"), 4.0, true)
+		draw_line(Vector2(-17.0, -20.0), Vector2(-27.0, -25.0), Color("#f28b78"), 3.0, true)
 	if GameManager.carry_level >= 1:
 		var bag_color: Color = Color("#b98550") if GameManager.carry_level < 3 else Color("#537e8c")
-		draw_rect(Rect2(Vector2(-11.0, -2.0), Vector2(9.0, 12.0)), bag_color, true)
-		draw_arc(Vector2(-6.5, -2.0), 5.0, PI, TAU, 10, Color("#e7c18a"), 2.0, true)
-	if carrying:
-		var cheese_center: Vector2 = Vector2(-2.0, -21.0)
-		draw_colored_polygon(PackedVector2Array([
-			cheese_center + Vector2(-7.0, 5.0),
-			cheese_center + Vector2(7.0, 5.0),
-			cheese_center + Vector2(5.0, -6.0)
-		]), Color("#f6c445"))
-		draw_circle(cheese_center + Vector2(1.0, 1.0), 1.5, Color("#c88b24"))
+		draw_rect(Rect2(Vector2(-12.0, -34.0), Vector2(15.0, 17.0)), bag_color, true)
+		draw_arc(Vector2(-4.5, -33.0), 8.0, PI, TAU, 12, Color("#e7c18a"), 2.0, true)
+	draw_set_transform(Vector2.ZERO)
