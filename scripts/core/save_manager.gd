@@ -4,6 +4,8 @@ const SAVE_PATH: String = "user://savegame.json"
 const BACKUP_PATH: String = "user://savegame.backup.json"
 const TEMP_PATH: String = "user://savegame.tmp.json"
 const WEB_STORAGE_KEY: String = "jjugumeong.save.v1"
+const WEB_COOKIE_KEY: String = "jjugumeong_save"
+const WEB_COOKIE_MAX_SIZE: int = 2500
 const CURRENT_SCHEMA_VERSION: int = 1
 
 var last_load_used_backup: bool = false
@@ -101,17 +103,35 @@ func _read_web_storage() -> Dictionary:
 	if not OS.has_feature("web"):
 		return {}
 	var key_literal: String = JSON.stringify(WEB_STORAGE_KEY)
-	var stored_value: Variant = JavaScriptBridge.eval(
+	var local_value: Variant = JavaScriptBridge.eval(
 		(
 			"(function(){try{return localStorage.getItem(%s) || '';}"
 			+ "catch(error){return '';}})()"
 		) % key_literal,
 		true
 	)
-	if not stored_value is String:
-		return {}
-	@warning_ignore("unsafe_cast")
-	return _parse_and_validate(stored_value as String)
+	var cookie_name_literal: String = JSON.stringify("%s=" % WEB_COOKIE_KEY)
+	var cookie_value: Variant = JavaScriptBridge.eval(
+		(
+			"(function(){try{const prefix=%s;"
+			+ "const item=document.cookie.split('; ').find("
+			+ "(row)=>row.startsWith(prefix));"
+			+ "return item ? decodeURIComponent(item.slice(prefix.length)) : '';}"
+			+ "catch(error){return '';}})()"
+		) % cookie_name_literal,
+		true
+	)
+	var local_data: Dictionary = {}
+	var cookie_data: Dictionary = {}
+	if local_value is String:
+		@warning_ignore("unsafe_cast")
+		local_data = _parse_and_validate(local_value as String)
+	if cookie_value is String:
+		@warning_ignore("unsafe_cast")
+		cookie_data = _parse_and_validate(cookie_value as String)
+	if _is_newer_save(cookie_data, local_data):
+		return cookie_data
+	return local_data
 
 
 func _write_web_storage(json_text: String) -> bool:
@@ -119,7 +139,7 @@ func _write_web_storage(json_text: String) -> bool:
 		return true
 	var key_literal: String = JSON.stringify(WEB_STORAGE_KEY)
 	var value_literal: String = JSON.stringify(json_text)
-	var saved: Variant = JavaScriptBridge.eval(
+	var local_saved: Variant = JavaScriptBridge.eval(
 		(
 			"(function(){try{localStorage.setItem(%s,%s);"
 			+ "return localStorage.getItem(%s) === %s;}"
@@ -127,7 +147,22 @@ func _write_web_storage(json_text: String) -> bool:
 		) % [key_literal, value_literal, key_literal, value_literal],
 		true
 	)
-	return saved is bool and saved
+	var cookie_saved: bool = false
+	if json_text.length() <= WEB_COOKIE_MAX_SIZE:
+		var cookie_name_literal: String = JSON.stringify("%s=" % WEB_COOKIE_KEY)
+		var cookie_result: Variant = JavaScriptBridge.eval(
+			(
+				"(function(){try{const prefix=%s;"
+				+ "document.cookie=prefix+encodeURIComponent(%s)"
+				+ "+'; Max-Age=31536000; Path=/; SameSite=Lax; Secure';"
+				+ "return document.cookie.split('; ').some("
+				+ "(row)=>row.startsWith(prefix));}"
+				+ "catch(error){return false;}})()"
+			) % [cookie_name_literal, value_literal],
+			true
+		)
+		cookie_saved = cookie_result is bool and cookie_result
+	return (local_saved is bool and local_saved) or cookie_saved
 
 
 func _is_newer_save(candidate: Dictionary, current: Dictionary) -> bool:

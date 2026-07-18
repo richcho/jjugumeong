@@ -11,6 +11,7 @@ func _run_tests() -> void:
 	_test_time_cap()
 	_test_upgrade_costs()
 	_test_golden_reward()
+	_test_reward_text_bounds()
 	_test_korean_font()
 	_test_save_round_trip()
 	await _test_mouse_round_trip()
@@ -47,11 +48,43 @@ func _test_golden_reward() -> void:
 	GameManager.total_cheese = 0.0
 	GameManager.carry_level = 0
 	GameManager.current_stage_index = 0
+	GameManager.golden_remaining = 0.0
+	var normal_reward: int = GameManager.collect_trip(1)
+	_expect_equal_int(normal_reward, 25, "alpha test multiplier")
+	GameManager.cheese = 0.0
+	GameManager.total_cheese = 0.0
 	GameManager.golden_remaining = 1.0
 	var reward: int = GameManager.collect_trip(1)
-	_expect_equal_int(reward, 5, "golden cheese multiplier")
-	_expect_equal_float(GameManager.cheese, 5.0, "golden cheese balance")
+	_expect_equal_int(reward, 125, "alpha and golden cheese multipliers")
+	_expect_equal_float(GameManager.cheese, 125.0, "golden cheese balance")
 	GameManager.golden_remaining = 0.0
+
+
+func _test_reward_text_bounds() -> void:
+	var world_view: WorldView = WorldView.new()
+	var upper_left_value: Variant = world_view.call(
+		"_clamp_reward_position",
+		Vector2(-100.0, -100.0),
+		120.0,
+		Vector2(1024.0, 768.0)
+	)
+	var lower_right_value: Variant = world_view.call(
+		"_clamp_reward_position",
+		Vector2(2000.0, 2000.0),
+		120.0,
+		Vector2(1024.0, 768.0)
+	)
+	_expect_true(upper_left_value is Vector2, "reward upper-left position type")
+	_expect_true(lower_right_value is Vector2, "reward lower-right position type")
+	if upper_left_value is Vector2 and lower_right_value is Vector2:
+		@warning_ignore("unsafe_cast")
+		var upper_left: Vector2 = upper_left_value as Vector2
+		@warning_ignore("unsafe_cast")
+		var lower_right: Vector2 = lower_right_value as Vector2
+		_expect_true(upper_left.x >= 24.0 and upper_left.y >= 165.0, "reward upper-left bounds")
+		_expect_true(lower_right.x <= 880.0, "reward right bound")
+		_expect_true(lower_right.y <= 563.0, "reward bottom bound")
+	world_view.free()
 
 
 func _test_korean_font() -> void:

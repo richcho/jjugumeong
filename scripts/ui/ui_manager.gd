@@ -82,7 +82,7 @@ func _build_interface() -> void:
 	var title_row: HBoxContainer = HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 14)
 	top_vbox.add_child(title_row)
-	title_label = _make_label("쥐구멍  JJUGUMEONG", 25, Color("#ffd969"))
+	title_label = _make_label("쥐구멍  ALPHA 0.1.2", 25, Color("#ffd969"))
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title_label)
 	save_label = _make_label("불러오는 중...", 14, Color("#afc9bd"))
@@ -105,6 +105,8 @@ func _build_interface() -> void:
 	top_vbox.add_child(event_row)
 	golden_label = _make_label("", 14, Color("#ffe384"))
 	golden_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	golden_label.clip_text = true
+	golden_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	event_row.add_child(golden_label)
 	boost_label = _make_label("이동 구역 클릭: 속도 부스트", 14, Color("#9edbff"))
 	boost_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -139,7 +141,7 @@ func _build_interface() -> void:
 	button_grid.add_child(mouse_button)
 	button_grid.add_child(hole_button)
 	button_grid.add_child(_make_button("통계", _show_stats, Color("#394b63")))
-	button_grid.add_child(_make_button("도감 (예정)", _show_future_message.bind("도감"), Color("#303640")))
+	button_grid.add_child(_make_button("수동 저장", _save_manually, Color("#3f625c")))
 	button_grid.add_child(_make_button("탐험 (예정)", _show_future_message.bind("탐험"), Color("#303640")))
 	button_grid.add_child(_make_button("건설·연구 (예정)", _show_future_message.bind("건설·연구"), Color("#303640")))
 
@@ -429,6 +431,13 @@ func _hide_offline_reward() -> void:
 	offline_panel.hide()
 
 
+func _save_manually() -> void:
+	if GameManager.save_now():
+		_show_toast("저장됨")
+	else:
+		_show_toast("저장 실패 · Safari 설정 확인 필요")
+
+
 func _show_future_message(feature_name: String) -> void:
 	_show_toast("%s은 다음 개발 버전에서 열립니다." % feature_name)
 
@@ -447,9 +456,9 @@ func _on_stage_changed(_stage_index: int) -> void:
 
 func _on_golden_changed(active: bool, remaining: float) -> void:
 	if active:
-		golden_label.text = "★ 황금치즈 %.1f초 · 보상 5배" % remaining
+		golden_label.text = "황금치즈 %.1f초 · 5배" % remaining
 	else:
-		golden_label.text = "황금치즈를 탐색 중..."
+		golden_label.text = "ALPHA 보상 25배"
 
 
 func _on_boost_changed(active: bool, remaining: float) -> void:

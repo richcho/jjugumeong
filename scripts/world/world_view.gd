@@ -4,6 +4,10 @@ extends Node2D
 const MOUSE_SCENE: PackedScene = preload("res://scenes/mouse/mouse.tscn")
 const GAME_FONT: FontFile = preload("res://assets/fonts/NotoSansKR-Subset.ttf")
 const MAX_LANE_ROWS: int = 7
+const REWARD_FONT_SIZE: int = 22
+const REWARD_SIDE_MARGIN: float = 24.0
+const REWARD_TOP_MARGIN: float = 165.0
+const REWARD_BOTTOM_MARGIN: float = 205.0
 
 var hole_position: Vector2 = Vector2.ZERO
 var resource_position: Vector2 = Vector2.ZERO
@@ -69,13 +73,21 @@ func _draw() -> void:
 		var effect_position: Vector2 = _dictionary_vector2(effect, "position", Vector2.ZERO)
 		var amount: int = _dictionary_int(effect, "amount", 0)
 		var alpha: float = clampf(_dictionary_float(effect, "remaining", 0.0), 0.0, 1.0)
+		var reward_text: String = "+%d 치즈" % amount
+		var text_width: float = GAME_FONT.get_string_size(
+			reward_text,
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1.0,
+			REWARD_FONT_SIZE
+		).x
+		effect_position = _clamp_reward_position(effect_position, text_width, viewport_size)
 		draw_string(
 			GAME_FONT,
 			effect_position,
-			"+%d 치즈" % amount,
+			reward_text,
 			HORIZONTAL_ALIGNMENT_LEFT,
 			-1.0,
-			22,
+			REWARD_FONT_SIZE,
 			Color(1.0, 0.86, 0.28, alpha)
 		)
 
@@ -183,6 +195,25 @@ func _on_golden_cheese_changed(_active: bool, _remaining: float) -> void:
 
 func _on_viewport_size_changed() -> void:
 	_update_layout()
+
+
+func _clamp_reward_position(
+	position_value: Vector2,
+	text_width: float,
+	viewport_size: Vector2
+) -> Vector2:
+	var maximum_x: float = maxf(
+		REWARD_SIDE_MARGIN,
+		viewport_size.x - text_width - REWARD_SIDE_MARGIN
+	)
+	var maximum_y: float = maxf(
+		REWARD_TOP_MARGIN,
+		viewport_size.y - REWARD_BOTTOM_MARGIN
+	)
+	return Vector2(
+		clampf(position_value.x, REWARD_SIDE_MARGIN, maximum_x),
+		clampf(position_value.y, REWARD_TOP_MARGIN, maximum_y)
+	)
 
 
 func _dictionary_float(data: Dictionary, key: String, fallback: float) -> float:

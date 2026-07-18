@@ -5,6 +5,7 @@ const AUTO_SAVE_INTERVAL: float = 3.0
 const BASE_SPEED: float = 150.0
 const SPEED_PER_LEVEL: float = 22.5
 const BASE_CARRY: int = 1
+const ALPHA_TEST_REWARD_MULTIPLIER: float = 25.0
 const GOLDEN_DURATION: float = 10.0
 const GOLDEN_MULTIPLIER: float = 5.0
 const CLICK_BOOST_DURATION: float = 3.0
@@ -84,7 +85,11 @@ func _notification(what: int) -> void:
 
 
 func collect_trip(base_amount: int) -> int:
-	var reward: float = float(base_amount) * get_stage_bonus()
+	var reward: float = (
+		float(base_amount)
+		* get_stage_bonus()
+		* ALPHA_TEST_REWARD_MULTIPLIER
+	)
 	if golden_remaining > 0.0:
 		reward *= GOLDEN_MULTIPLIER
 	var final_reward: int = maxi(1, roundi(reward))
@@ -220,7 +225,11 @@ func get_next_stage() -> Dictionary:
 
 func get_expected_per_second() -> float:
 	var round_trip_seconds: float = (ESTIMATED_ONE_WAY_DISTANCE * 2.0) / get_move_speed()
-	var reward_per_trip: float = float(get_carry_capacity()) * get_stage_bonus()
+	var reward_per_trip: float = (
+		float(get_carry_capacity())
+		* get_stage_bonus()
+		* ALPHA_TEST_REWARD_MULTIPLIER
+	)
 	if golden_remaining > 0.0:
 		reward_per_trip *= GOLDEN_MULTIPLIER
 	return reward_per_trip * float(mouse_count) / maxf(round_trip_seconds, 0.1)

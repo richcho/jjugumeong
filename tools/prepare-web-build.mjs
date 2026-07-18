@@ -108,6 +108,24 @@ body {
 \ttouch-action: none;
 \t-webkit-text-size-adjust: 100%;
 }`;
+const serviceWorkerRefreshScript = `<script>
+if ('serviceWorker' in navigator) {
+\tlet refreshing = false;
+\tnavigator.serviceWorker.addEventListener('controllerchange', function () {
+\t\tif (!refreshing) {
+\t\t\trefreshing = true;
+\t\t\twindow.location.reload();
+\t\t}
+\t});
+\twindow.addEventListener('load', function () {
+\t\tnavigator.serviceWorker.getRegistration()
+\t\t\t.then(function (registration) {
+\t\t\t\tif (registration) registration.update();
+\t\t\t})
+\t\t\t.catch(function () {});
+\t});
+}
+</script>`;
 
 if (
   !html.includes(originalViewport) ||
@@ -119,7 +137,8 @@ if (
 html = html
   .replace(originalViewport, iPadViewport)
   .replace(originalBodyStyle, responsiveBodyStyle)
-  .replace(originalCanvasStyle, responsiveCanvasStyle);
+  .replace(originalCanvasStyle, responsiveCanvasStyle)
+  .replace("</head>", `${serviceWorkerRefreshScript}\n\t</head>`);
 writeFileSync(htmlPath, `${html.trimEnd()}\n`);
 
 const workerPath = join(destination, "index.service.worker.js");
@@ -131,6 +150,19 @@ if (!worker.includes(originalCacheable)) {
   throw new Error("Godot service worker shape changed; gzip cache patch was not applied.");
 }
 worker = worker.replace(originalCacheable, compressedCacheable);
+const immediateActivation = `
+self.addEventListener('install', (event) => {
+\tevent.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+\tevent.waitUntil(self.clients.claim());
+});
+`;
+worker = worker.replace(
+  compressedCacheable,
+  `${compressedCacheable}\n${immediateActivation}`,
+);
 writeFileSync(workerPath, `${worker.trimEnd()}\n`);
 
 console.log(
