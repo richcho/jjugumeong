@@ -9,10 +9,13 @@ func _ready() -> void:
 
 func _run_tests() -> void:
 	_test_time_cap()
+	_test_build_info()
 	_test_upgrade_costs()
 	_test_natural_speed_curve()
+	_test_visual_progression()
 	_test_golden_reward()
 	_test_colony_progression()
+	_test_next_reward_summary()
 	_test_reward_text_bounds()
 	_test_stage_backgrounds()
 	_test_background_anchor_alignment()
@@ -35,6 +38,14 @@ func _test_time_cap() -> void:
 	var now: int = TimeManager.current_unix_time()
 	_expect_equal_int(TimeManager.capped_offline_seconds(now - 20_000), 14_400, "offline cap")
 	_expect_equal_int(TimeManager.capped_offline_seconds(now + 100), 0, "future timestamp")
+
+
+func _test_build_info() -> void:
+	_expect_true(GameManager.display_name == "쥐구멍", "build display name")
+	_expect_true(GameManager.product_name == "r4", "build product name")
+	_expect_true(GameManager.build_version == "0.2.7", "build version")
+	_expect_true(GameManager.build_phase == "V0.2 Alpha", "build phase")
+	_expect_true(GameManager.get_build_label() == "r4 0.2.7", "build label")
 
 
 func _test_upgrade_costs() -> void:
@@ -69,6 +80,26 @@ func _test_natural_speed_curve() -> void:
 	GameManager.click_boost_remaining = previous_boost_remaining
 
 
+func _test_visual_progression() -> void:
+	_expect_equal_int(VisualProgression.speed_tier(0), 0, "base speed visual tier")
+	_expect_equal_int(VisualProgression.speed_tier(1), 1, "scarf visual tier")
+	_expect_equal_int(VisualProgression.speed_tier(3), 2, "shoes visual tier")
+	_expect_equal_int(VisualProgression.speed_tier(6), 3, "master speed visual tier")
+	_expect_equal_int(VisualProgression.carry_tier(0), 0, "base carry visual tier")
+	_expect_equal_int(VisualProgression.carry_tier(1), 1, "pouch visual tier")
+	_expect_equal_int(VisualProgression.carry_tier(3), 2, "backpack visual tier")
+	_expect_equal_int(VisualProgression.carry_tier(6), 3, "professional carry visual tier")
+	_expect_equal_int(VisualProgression.hole_tier(1), 0, "base hole visual tier")
+	_expect_equal_int(VisualProgression.hole_tier(2), 1, "reinforced hole visual tier")
+	_expect_equal_int(VisualProgression.hole_tier(3), 2, "storage hole visual tier")
+	_expect_equal_int(VisualProgression.hole_tier(4), 3, "village entrance visual tier")
+	_expect_equal_int(VisualProgression.hole_tier(5), 4, "civilization gate visual tier")
+	_expect_true(
+		VisualProgression.equipment_summary(3, 3) == "운동화 · 배낭",
+		"equipment summary"
+	)
+
+
 func _test_golden_reward() -> void:
 	GameManager.cheese = 0.0
 	GameManager.total_cheese = 0.0
@@ -99,6 +130,32 @@ func _test_colony_progression() -> void:
 	GameManager.hole_level = 20
 	_expect_true(GameManager.get_colony_rank() == "쥐구멍 도시", "colony city rank")
 	_expect_true(not GameManager.get_world_news().is_empty(), "world news available")
+	GameManager.hole_level = previous_hole_level
+
+
+func _test_next_reward_summary() -> void:
+	var previous_stage_index: int = GameManager.current_stage_index
+	var previous_total_cheese: float = GameManager.total_cheese
+	var previous_hole_level: int = GameManager.hole_level
+
+	GameManager.current_stage_index = 0
+	GameManager.total_cheese = 50.0
+	var stage_reward: Dictionary = GameManager.get_next_reward_summary()
+	_expect_true(str(stage_reward.get("kind", "")) == "stage", "stage reward kind")
+	_expect_dictionary_float(stage_reward, "current", 50.0, "stage reward current")
+	_expect_dictionary_float(stage_reward, "target", 100.0, "stage reward target")
+	_expect_dictionary_float(stage_reward, "progress", 50.0, "stage reward progress")
+
+	GameManager.current_stage_index = maxi(0, GameManager.stages.size() - 1)
+	GameManager.hole_level = 15
+	var colony_reward: Dictionary = GameManager.get_next_reward_summary()
+	_expect_true(str(colony_reward.get("kind", "")) == "colony", "colony reward kind")
+	_expect_dictionary_float(colony_reward, "current", 15.0, "colony reward current")
+	_expect_dictionary_float(colony_reward, "target", 20.0, "colony reward target")
+	_expect_dictionary_float(colony_reward, "progress", 50.0, "colony reward progress")
+
+	GameManager.current_stage_index = previous_stage_index
+	GameManager.total_cheese = previous_total_cheese
 	GameManager.hole_level = previous_hole_level
 
 
@@ -315,6 +372,28 @@ func _test_ui_layout() -> void:
 	host.queue_free()
 	await get_tree().process_frame
 
+	var landscape_host: Control = Control.new()
+	landscape_host.size = Vector2(1366.0, 1024.0)
+	add_child(landscape_host)
+	var landscape_ui: GameUI = GameUI.new()
+	landscape_host.add_child(landscape_ui)
+	await get_tree().process_frame
+	_expect_true(landscape_ui.info_grid.columns == 4, "landscape info columns")
+	_expect_true(landscape_ui.event_grid.columns == 3, "landscape event columns")
+	_expect_true(landscape_ui.button_grid.columns == 4, "landscape action columns")
+	_expect_true(
+		landscape_ui.top_panel.position.x + landscape_ui.top_panel.size.x
+		<= landscape_host.size.x,
+		"landscape top panel right bound"
+	)
+	_expect_true(
+		landscape_ui.bottom_panel.position.y + landscape_ui.bottom_panel.size.y
+		<= landscape_host.size.y,
+		"landscape bottom panel bound"
+	)
+	landscape_host.queue_free()
+	await get_tree().process_frame
+
 
 func _test_mouse_round_trip() -> void:
 	GameManager.cheese = 0.0
@@ -341,6 +420,24 @@ func _expect_equal_int(actual: int, expected: int, label: String) -> void:
 func _expect_equal_float(actual: float, expected: float, label: String) -> void:
 	if not is_equal_approx(actual, expected):
 		_fail("%s: expected %.3f, got %.3f" % [label, expected, actual])
+
+
+func _expect_dictionary_float(
+	data: Dictionary,
+	key: String,
+	expected: float,
+	label: String
+) -> void:
+	var value: Variant = data.get(key, -1.0)
+	if value is float:
+		@warning_ignore("unsafe_call_argument")
+		_expect_equal_float(value, expected, label)
+		return
+	if value is int:
+		@warning_ignore("unsafe_call_argument")
+		_expect_equal_float(float(value), expected, label)
+		return
+	_fail("%s: expected numeric value" % label)
 
 
 func _expect_true(actual: bool, label: String) -> void:

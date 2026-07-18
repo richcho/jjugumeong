@@ -97,7 +97,11 @@ func _build_interface() -> void:
 	var title_row: HBoxContainer = HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 14)
 	top_vbox.add_child(title_row)
-	title_label = _make_label("쥐구멍  r4 0.2.5", 22, Color("#ffd969"))
+	title_label = _make_label(
+		"%s  %s" % [GameManager.display_name, GameManager.get_build_label()],
+		22,
+		Color("#ffd969")
+	)
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title_label)
 	save_label = _make_label("불러오는 중...", 14, Color("#afc9bd"))
@@ -323,9 +327,13 @@ func _refresh_all() -> void:
 	cheese_label.text = "치즈  %s" % _format_number(GameManager.cheese)
 	production_label.text = "예상 생산  %s/초" % _format_number(GameManager.get_expected_per_second())
 	var visible_groups: int = mini(GameManager.mouse_count, 3)
-	mouse_label.text = "쥐  %d마리 · 활동조 %d" % [
+	mouse_label.text = "쥐  %d · 활동조 %d · %s" % [
 		GameManager.mouse_count,
-		visible_groups
+		visible_groups,
+		VisualProgression.equipment_summary(
+			GameManager.speed_level,
+			GameManager.carry_level
+		)
 	]
 	speed_button.text = "속도 Lv.%d  ·  치즈 %s" % [
 		GameManager.speed_level,
@@ -350,56 +358,17 @@ func _refresh_all() -> void:
 	mouse_button.disabled = GameManager.cheese < float(GameManager.get_mouse_cost())
 	hole_button.disabled = GameManager.cheese < float(GameManager.get_hole_upgrade_cost())
 
-	var next_stage: Dictionary = GameManager.get_next_stage()
-	if next_stage.is_empty():
-		var colony_goal: Dictionary = GameManager.get_next_colony_goal()
-		var target_level: int = _dictionary_int(
-			colony_goal,
-			"target_level",
-			GameManager.hole_level + 1
-		)
-		var previous_level: int = _dictionary_int(colony_goal, "previous_level", 0)
-		next_stage_label.text = "세계 소식 · %s" % GameManager.get_world_news()
-		next_reward_title.text = "%s · 다음: %s" % [
-			GameManager.get_colony_rank(),
-			str(colony_goal.get("title", "쥐 사회 확장"))
-		]
-		next_reward_detail.text = "쥐구멍 Lv.%d / %d · %s" % [
-			GameManager.hole_level,
-			target_level,
-			str(colony_goal.get("description", "새 생활 공간 발견"))
-		]
-		next_reward_progress.value = clampf(
-			float(GameManager.hole_level - previous_level)
-			/ float(maxi(1, target_level - previous_level))
-			* 100.0,
-			0.0,
-			100.0
-		)
-	else:
-		var current_threshold: float = _dictionary_float(stage, "unlock_total_cheese", 0.0)
-		var target_threshold: float = _dictionary_float(next_stage, "unlock_total_cheese", 0.0)
-		var needed: float = maxf(
-			0.0,
-			target_threshold - GameManager.total_cheese
-		)
-		next_stage_label.text = "다음: %s (누적 %s 남음)" % [
-			_dictionary_string(next_stage, "name", ""),
-			_format_number(needed)
-		]
-		next_reward_title.text = "다음 보상  ·  %s" % _dictionary_string(next_stage, "name", "")
-		next_reward_detail.text = "%s / %s  ·  %s" % [
-			_format_number(GameManager.total_cheese),
-			_format_number(target_threshold),
-			_get_stage_preview(GameManager.current_stage_index + 1)
-		]
-		next_reward_progress.value = clampf(
-			(GameManager.total_cheese - current_threshold)
-			/ maxf(1.0, target_threshold - current_threshold)
-			* 100.0,
-			0.0,
-			100.0
-		)
+	var reward: Dictionary = GameManager.get_next_reward_summary()
+	var reward_current: float = _dictionary_float(reward, "current", 0.0)
+	var reward_target: float = _dictionary_float(reward, "target", 1.0)
+	next_stage_label.text = _dictionary_string(reward, "status", "")
+	next_reward_title.text = _dictionary_string(reward, "title", "다음 보상")
+	next_reward_detail.text = "%s / %s · %s" % [
+		_format_number(reward_current),
+		_format_number(reward_target),
+		_dictionary_string(reward, "detail", "")
+	]
+	next_reward_progress.value = _dictionary_float(reward, "progress", 0.0)
 	_on_golden_changed(GameManager.golden_remaining > 0.0, GameManager.golden_remaining)
 	_on_boost_changed(GameManager.click_boost_remaining > 0.0, GameManager.click_boost_remaining)
 

@@ -15,6 +15,10 @@ import { gzipSync } from "node:zlib";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const source = join(root, "builds", "web");
 const destination = join(root, "public", "game");
+const buildInfo = JSON.parse(
+  readFileSync(join(root, "data", "build.json"), "utf8"),
+);
+const buildLabel = `${buildInfo.product_name} ${buildInfo.version}`;
 
 if (!existsSync(join(source, "index.html"))) {
   throw new Error(
@@ -126,6 +130,9 @@ if ('serviceWorker' in navigator) {
 \t});
 }
 </script>`;
+const buildMeta =
+  `<meta name="jjugumeong-build" content="${buildLabel}">\n` +
+  `<meta name="jjugumeong-phase" content="${buildInfo.phase}">`;
 
 if (
   !html.includes(originalViewport) ||
@@ -138,6 +145,7 @@ html = html
   .replace(originalViewport, iPadViewport)
   .replace(originalBodyStyle, responsiveBodyStyle)
   .replace(originalCanvasStyle, responsiveCanvasStyle)
+  .replace("</head>", `${buildMeta}\n\t</head>`)
   .replace("</head>", `${serviceWorkerRefreshScript}\n\t</head>`);
 writeFileSync(htmlPath, `${html.trimEnd()}\n`);
 
@@ -150,6 +158,14 @@ if (!worker.includes(originalCacheable)) {
   throw new Error("Godot service worker shape changed; gzip cache patch was not applied.");
 }
 worker = worker.replace(originalCacheable, compressedCacheable);
+const cacheVersionPattern = /const CACHE_VERSION = '([^']+)';/;
+if (!cacheVersionPattern.test(worker)) {
+  throw new Error("Godot service worker cache version was not found.");
+}
+worker = worker.replace(
+  cacheVersionPattern,
+  (_match, version) => `const CACHE_VERSION = '${buildLabel}|${version}';`,
+);
 const immediateActivation = `
 self.addEventListener('install', (event) => {
 \tevent.waitUntil(self.skipWaiting());
@@ -166,6 +182,6 @@ worker = worker.replace(
 writeFileSync(workerPath, `${worker.trimEnd()}\n`);
 
 console.log(
-  `Prepared iPad Web build: ${(wasm.length / 1024 / 1024).toFixed(1)} MiB WASM -> ` +
+  `Prepared ${buildLabel} iPad Web build: ${(wasm.length / 1024 / 1024).toFixed(1)} MiB WASM -> ` +
     `${(readFileSync(compressedWasmPath).length / 1024 / 1024).toFixed(1)} MiB gzip`,
 );

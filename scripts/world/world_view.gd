@@ -91,6 +91,9 @@ func _draw() -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	_draw_stage_background(viewport_size)
 	_draw_atmosphere(viewport_size)
+	if GameManager.current_stage_index < STAGE_BACKGROUNDS.size():
+		_draw_embedded_hole_progress()
+		_draw_resident_mice()
 	if SHOW_ROUTE_DEBUG:
 		draw_line(hole_position, resource_position, Color(1.0, 0.82, 0.42, 0.28), 3.0, true)
 		for marker_index: int in range(1, 8):
@@ -168,20 +171,25 @@ func _draw_atmosphere(viewport_size: Vector2) -> void:
 func _draw_mouse_hole() -> void:
 	if GameManager.current_stage_index < STAGE_BACKGROUNDS.size():
 		return
+	var hole_tier: int = VisualProgression.hole_tier(GameManager.hole_level)
 	var hole_scale: float = 1.0 + minf(float(GameManager.hole_level - 1) * 0.07, 0.55)
 	draw_circle(hole_position + Vector2(0.0, 10.0), 62.0 * hole_scale, Color(0.07, 0.04, 0.08, 0.78))
 	draw_circle(hole_position + Vector2(0.0, 12.0), 43.0 * hole_scale, Color(0.02, 0.015, 0.025, 0.9))
 	draw_arc(hole_position + Vector2(0.0, 10.0), 64.0 * hole_scale, PI, TAU, 28, Color("#8b6849"), 8.0, true)
-	if GameManager.hole_level >= 2:
+	if hole_tier >= 1:
 		draw_line(hole_position + Vector2(-52.0, 50.0), hole_position + Vector2(-52.0, -20.0), Color("#a7794d"), 8.0, true)
 		draw_line(hole_position + Vector2(52.0, 50.0), hole_position + Vector2(52.0, -20.0), Color("#a7794d"), 8.0, true)
-	if GameManager.hole_level >= 3:
+	if hole_tier >= 2:
 		draw_rect(Rect2(hole_position + Vector2(-70.0, 48.0), Vector2(140.0, 8.0)), Color("#c09155"))
 		for item_index: int in range(4):
 			draw_circle(hole_position + Vector2(-45.0 + float(item_index) * 30.0, 38.0), 7.0, Color("#f0bd45"))
-	if GameManager.hole_level >= 4:
+	if hole_tier >= 3:
 		draw_circle(hole_position + Vector2(0.0, -62.0), 12.0, Color(1.0, 0.72, 0.2, 0.32))
 		draw_circle(hole_position + Vector2(0.0, -62.0), 5.0, Color("#ffd879"))
+	if hole_tier >= 4:
+		draw_rect(Rect2(hole_position + Vector2(-42.0, -88.0), Vector2(84.0, 20.0)), Color("#6f4f36"), true)
+		draw_line(hole_position + Vector2(-28.0, 56.0), hole_position + Vector2(-45.0, 82.0), Color("#b58a55"), 4.0, true)
+		draw_line(hole_position + Vector2(28.0, 56.0), hole_position + Vector2(45.0, 82.0), Color("#b58a55"), 4.0, true)
 	draw_string(
 		GAME_FONT,
 		hole_position + Vector2(-54.0, 103.0),
@@ -194,17 +202,22 @@ func _draw_mouse_hole() -> void:
 
 
 func _draw_embedded_hole_progress() -> void:
+	var hole_tier: int = VisualProgression.hole_tier(GameManager.hole_level)
 	var pulse: float = 0.5 + sin(float(Time.get_ticks_msec()) * 0.004) * 0.12
 	draw_circle(hole_position, 45.0, Color(1.0, 0.63, 0.2, 0.05 + pulse * 0.05))
 	draw_arc(hole_position, 39.0, 0.15, PI - 0.15, 28, Color(1.0, 0.77, 0.36, 0.52), 3.0, true)
-	if GameManager.hole_level >= 2:
+	if hole_tier >= 1:
 		draw_line(hole_position + Vector2(-30.0, 20.0), hole_position + Vector2(-30.0, -20.0), Color("#b7834e"), 5.0, true)
 		draw_line(hole_position + Vector2(30.0, 20.0), hole_position + Vector2(30.0, -20.0), Color("#b7834e"), 5.0, true)
-	if GameManager.hole_level >= 3:
+	if hole_tier >= 2:
 		for item_index: int in range(3):
 			draw_circle(hole_position + Vector2(-18.0 + float(item_index) * 18.0, 28.0), 4.0, Color("#f0bd45"))
-	if GameManager.hole_level >= 4:
+	if hole_tier >= 3:
 		draw_circle(hole_position + Vector2(0.0, -42.0), 7.0, Color(1.0, 0.75, 0.28, pulse))
+	if hole_tier >= 4:
+		draw_rect(Rect2(hole_position + Vector2(-25.0, -57.0), Vector2(50.0, 11.0)), Color("#715039"), true)
+		draw_line(hole_position + Vector2(-20.0, 28.0), hole_position + Vector2(-35.0, 42.0), Color("#c49a62"), 3.0, true)
+		draw_line(hole_position + Vector2(20.0, 28.0), hole_position + Vector2(35.0, 42.0), Color("#c49a62"), 3.0, true)
 
 
 func _draw_cheese_resource() -> void:

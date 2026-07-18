@@ -26,6 +26,7 @@
   "type": "module",
   "scripts": {
     "prepare:game": "node tools/prepare-web-build.mjs",
+    "verify:game": "node tools/verify-web-build.mjs",
     "dev": "vinext dev",
     "build": "vinext build && node tools/copy-hosting-config.mjs",
     "start": "wrangler dev --config dist/server/wrangler.json",

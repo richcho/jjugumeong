@@ -16,6 +16,7 @@
 | 구성요소 | 책임 | 소유하면 안 되는 것 |
 | --- | --- | --- |
 | `GameManager` | 자원, 강화, 지역, 이벤트 시간, 통계 | UI 노드와 파일 저장 구현 |
+| `VisualProgression` | 강화 레벨을 외형 티어와 표시 이름으로 변환 | 자원 계산과 영구 상태 |
 | `SaveManager` | JSON 저장, 백업, 검증, 마이그레이션 | 게임 규칙과 화면 표시 |
 | `EventBus` | 상태 변경 신호 | 영구 상태 |
 | `GatheringMouse` | 개별 쥐 이동과 운반 상태 | 전체 자원 잔액 |
@@ -38,6 +39,7 @@ GatheringMouse 귀환
 
 | 경로 | 내용 |
 | --- | --- |
+| `data/build.json` | 제품명, 표시 버전과 개발 단계의 단일 기준 |
 | `data/stages/stages.json` | 지역, 해금 수치, 생산 보너스, 위험과 사건 |
 | `data/mice/basic_mouse.json` | 기본 집쥐 능력의 확장 초안 |
 | `data/resources/cheese.json` | 기본 자원 정의 |
@@ -123,6 +125,9 @@ Godot Web export
      - WASM gzip
      - Safari viewport 보정
      - 서비스 워커 캐시 경로 보정
+     - 빌드 버전 메타데이터 삽입
+  → tools/verify-web-build.mjs
+     - viewport, PWA, 서비스 워커와 gzip WASM 검사
   → Vinext build
   → dist
   → Sites 배포
@@ -140,6 +145,7 @@ godot4 --path . --headless --import
 godot4 --path . --headless tests/test_runner.tscn
 godot4 --path . --headless --export-release Web builds/web/index.html
 npm run prepare:game
+npm run verify:game
 npm run build
 git diff --check
 ```
@@ -166,8 +172,8 @@ git diff --check
 
 | 상태 | 과제 | 처리 방향 |
 | --- | --- | --- |
-| 다음 | 시각 단계 매핑 | 레벨을 표현 티어로 변환하는 별도 데이터 또는 함수 |
+| 구현됨 | 시각 단계 매핑 | `VisualProgression`이 속도·운반·쥐구멍 티어를 계산 |
 | 다음 | 지역 배경 책임 | `WorldView`를 지역 장면 구성 요소로 분리 |
-| 다음 | 다음 보상 계산 | UI가 직접 임계값을 계산하지 않고 상태 API 사용 |
+| 구현됨 | 다음 보상 계산 | `GameManager.get_next_reward_summary()` 상태 API 사용 |
 | 결정 대기 | 지역 선택 저장 | V0.3에서 `unlocked_stage_ids`와 현재 선택 지역 검토 |
 | 결정 대기 | 전체 한글 글꼴 크기 | 문구 증가 시 서브셋 재생성 또는 전체 폰트 전환 비교 |

@@ -1,6 +1,7 @@
 extends Node
 
 const STAGES_PATH: String = "res://data/stages/stages.json"
+const BUILD_INFO_PATH: String = "res://data/build.json"
 const AUTO_SAVE_INTERVAL: float = 3.0
 const BASE_SPEED: float = 115.0
 const SPEED_LEVEL_CURVE: float = 32.0
@@ -33,6 +34,10 @@ var total_golden_events: int = 0
 var stages: Array[Dictionary] = []
 var offline_reward: float = 0.0
 var offline_seconds: int = 0
+var display_name: String = "쥐구멍"
+var product_name: String = "r4"
+var build_version: String = "0.2.7"
+var build_phase: String = "V0.2 Alpha"
 
 var _auto_save_elapsed: float = 0.0
 var _next_golden_event: float = 45.0
@@ -40,6 +45,7 @@ var _is_ready: bool = false
 
 
 func _ready() -> void:
+	_load_build_info()
 	_load_stages()
 	var loaded_data: Dictionary = SaveManager.load_game(_default_save_data())
 	_apply_save_data(loaded_data)
@@ -228,6 +234,10 @@ func get_next_stage() -> Dictionary:
 	return stages[next_index]
 
 
+func get_build_label() -> String:
+	return "%s %s" % [product_name, build_version]
+
+
 func get_world_news() -> String:
 	var stage: Dictionary = get_current_stage()
 	var news_items: Array = stage.get("world_events", [])
@@ -273,6 +283,69 @@ func get_next_colony_goal() -> Dictionary:
 		"target_level": 75,
 		"title": "심층 세계 탐사",
 		"description": "미지의 지하 문명 발견"
+	}
+
+
+func get_next_reward_summary() -> Dictionary:
+	var next_stage: Dictionary = get_next_stage()
+	if next_stage.is_empty():
+		var colony_goal: Dictionary = get_next_colony_goal()
+		var target_level: int = _dictionary_int(
+			colony_goal,
+			"target_level",
+			hole_level + 1
+		)
+		var previous_level: int = _dictionary_int(colony_goal, "previous_level", 0)
+		var progress: float = clampf(
+			float(hole_level - previous_level)
+			/ float(maxi(1, target_level - previous_level))
+			* 100.0,
+			0.0,
+			100.0
+		)
+		return {
+			"kind": "colony",
+			"title": "%s · 다음: %s" % [
+				get_colony_rank(),
+				_dictionary_string(colony_goal, "title", "쥐 사회 확장")
+			],
+			"detail": "쥐구멍 Lv.%d / %d · %s" % [
+				hole_level,
+				target_level,
+				_dictionary_string(colony_goal, "description", "새 생활 공간 발견")
+			],
+			"status": "세계 소식 · %s" % get_world_news(),
+			"current": float(hole_level),
+			"target": float(target_level),
+			"progress": progress
+		}
+
+	var stage: Dictionary = get_current_stage()
+	var current_threshold: float = _dictionary_float(stage, "unlock_total_cheese", 0.0)
+	var target_threshold: float = _dictionary_float(next_stage, "unlock_total_cheese", 0.0)
+	var needed: float = maxf(0.0, target_threshold - total_cheese)
+	var next_index: int = current_stage_index + 1
+	return {
+		"kind": "stage",
+		"title": "다음 보상 · %s" % _dictionary_string(next_stage, "name", ""),
+		"detail": "%s · %s" % [
+			_dictionary_string(next_stage, "resource", "새 자원"),
+			_dictionary_string(next_stage, "event", "새 발견")
+		],
+		"status": "다음: %s (누적 %s 남음)" % [
+			_dictionary_string(next_stage, "name", ""),
+			_format_compact_number(needed)
+		],
+		"current": total_cheese,
+		"target": target_threshold,
+		"progress": clampf(
+			(total_cheese - current_threshold)
+			/ maxf(1.0, target_threshold - current_threshold)
+			* 100.0,
+			0.0,
+			100.0
+		),
+		"stage_index": next_index
 	}
 
 
@@ -328,6 +401,17 @@ func _spend_cheese(amount: int) -> bool:
 
 func _scaled_cost(base_cost: int, purchased_levels: int) -> int:
 	return roundi(float(base_cost) * pow(1.5, float(purchased_levels)))
+
+
+func _format_compact_number(value: float) -> String:
+	var absolute_value: float = absf(value)
+	if absolute_value >= 1_000_000_000.0:
+		return "%.2fB" % (value / 1_000_000_000.0)
+	if absolute_value >= 1_000_000.0:
+		return "%.2fM" % (value / 1_000_000.0)
+	if absolute_value >= 1_000.0:
+		return "%.2fK" % (value / 1_000.0)
+	return "%d" % roundi(value)
 
 
 func _update_unlocked_stage() -> void:
@@ -436,6 +520,22 @@ func _load_stages() -> void:
 			stages.append(raw_stage as Dictionary)
 	if stages.is_empty():
 		_use_fallback_stage()
+
+
+func _load_build_info() -> void:
+	var build_file: FileAccess = FileAccess.open(BUILD_INFO_PATH, FileAccess.READ)
+	if build_file == null:
+		return
+	var parsed: Variant = JSON.parse_string(build_file.get_as_text())
+	build_file.close()
+	if not parsed is Dictionary:
+		return
+	@warning_ignore("unsafe_cast")
+	var build_info: Dictionary = parsed as Dictionary
+	display_name = _dictionary_string(build_info, "display_name", display_name)
+	product_name = _dictionary_string(build_info, "product_name", product_name)
+	build_version = _dictionary_string(build_info, "version", build_version)
+	build_phase = _dictionary_string(build_info, "phase", build_phase)
 
 
 func _use_fallback_stage() -> void:
