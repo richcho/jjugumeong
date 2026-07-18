@@ -1,0 +1,14 @@
+{
+  "id": "house_mouse",
+  "name": "집쥐",
+  "rarity": "common",
+  "move_speed": 150.0,
+  "carry_capacity": 1,
+  "health": 10,
+  "evasion": 0.05,
+  "gather_efficiency": 1.0,
+  "combat_power": 1,
+  "research_power": 1,
+  "construction_power": 1,
+  "special_ability": ""
+}

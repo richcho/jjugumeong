@@ -1,0 +1,7 @@
+[
+  {"id": "mouse_hole", "name": "쥐구멍", "available_version": "0.1"},
+  {"id": "food_storage", "name": "식량 창고", "available_version": "0.6"},
+  {"id": "rest_area", "name": "휴식 공간", "available_version": "0.6"},
+  {"id": "training_ground", "name": "훈련장", "available_version": "0.6"},
+  {"id": "tunnel_entrance", "name": "터널 입구", "available_version": "0.6"}
+]

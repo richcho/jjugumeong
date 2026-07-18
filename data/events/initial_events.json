@@ -1,0 +1,9 @@
+[
+  {
+    "id": "golden_cheese",
+    "name": "황금치즈 발견",
+    "duration_seconds": 10.0,
+    "reward_multiplier": 5.0,
+    "available_version": "0.1"
+  }
+]

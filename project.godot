@@ -1,0 +1,48 @@
+; Engine configuration file.
+; Edit with Godot 4.x or a text editor.
+
+config_version=5
+
+[application]
+
+config/name="쥐구멍"
+config/description="작은 쥐구멍에서 시작하는 2D 방치형 문명 성장 게임"
+run/main_scene="res://scenes/main/main.tscn"
+config/icon="res://assets/icon.svg"
+
+[autoload]
+
+EventBus="*res://scripts/core/event_bus.gd"
+SaveManager="*res://scripts/core/save_manager.gd"
+GameManager="*res://scripts/core/game_manager.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=0
+
+[gui]
+
+theme/custom_font="res://assets/fonts/NotoSansKR-Subset.ttf"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.045, 0.035, 0.052, 1)
+
+[debug]
+
+gdscript/warnings/untyped_declaration=2
+gdscript/warnings/inferred_declaration=2
+gdscript/warnings/unsafe_method_access=2
+gdscript/warnings/unsafe_property_access=2
+gdscript/warnings/unsafe_call_argument=2
+gdscript/warnings/unsafe_cast=2
+gdscript/warnings/unsafe_void_return=2

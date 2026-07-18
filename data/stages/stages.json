@@ -1,0 +1,52 @@
+[
+  {
+    "id": "old_kitchen",
+    "name": "낡은 부엌",
+    "unlock_total_cheese": 0,
+    "production_bonus": 1.0,
+    "resource": "치즈",
+    "hazard": "고양이",
+    "event": "냉장고 문이 열림",
+    "background_color": "#352a3b"
+  },
+  {
+    "id": "food_storage",
+    "name": "식료품 창고",
+    "unlock_total_cheese": 100,
+    "production_bonus": 1.15,
+    "resource": "곡물 자루",
+    "hazard": "쥐덫",
+    "event": "대형 음식물 발견",
+    "background_color": "#26394a"
+  },
+  {
+    "id": "convenience_store",
+    "name": "동네 편의점",
+    "unlock_total_cheese": 500,
+    "production_bonus": 1.35,
+    "resource": "과자",
+    "hazard": "인간",
+    "event": "야간 폐기 시간",
+    "background_color": "#243f39"
+  },
+  {
+    "id": "restaurant",
+    "name": "대형 식당",
+    "unlock_total_cheese": 2000,
+    "production_bonus": 1.65,
+    "resource": "고급 치즈",
+    "hazard": "화재",
+    "event": "빵 축제",
+    "background_color": "#4a302c"
+  },
+  {
+    "id": "cheese_factory",
+    "name": "치즈 공장",
+    "unlock_total_cheese": 10000,
+    "production_bonus": 2.0,
+    "resource": "숙성 치즈",
+    "hazard": "기계",
+    "event": "황금치즈 발견",
+    "background_color": "#4b4025"
+  }
+]

@@ -1,0 +1,23 @@
+# Godot 4 generated files
+.godot/
+
+# Exported builds
+builds/
+export/
+
+# Web hosting build files
+node_modules/
+.next/
+dist/
+.vinext/
+.wrangler/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+*.tmp
+*.swp
+
+# Local test artifacts
+test-results/
