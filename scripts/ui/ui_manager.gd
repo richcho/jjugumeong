@@ -43,6 +43,12 @@ var region_event_title: Label
 var region_event_description: Label
 var region_choice_buttons: Array[Button] = []
 var region_event_button: Button
+var field_action_panel: PanelContainer
+var field_action_title: Label
+var field_action_description: Label
+var field_action_status: Label
+var field_action_view: DotActionView
+var field_action_button: Button
 
 var _toast_remaining: float = 0.0
 var _refresh_elapsed: float = 0.0
@@ -187,6 +193,8 @@ func _build_interface() -> void:
 	utility_row.add_child(_make_utility_button("지역", _show_regions))
 	region_event_button = _make_utility_button("지역 사건", _show_region_event)
 	utility_row.add_child(region_event_button)
+	field_action_button = _make_utility_button("현장 행동", _show_field_action)
+	utility_row.add_child(field_action_button)
 	utility_row.add_child(_make_utility_button("지금 저장", _save_manually))
 
 	toast_label = _make_label("", 20, Color("#fff4d4"))
@@ -204,6 +212,7 @@ func _build_interface() -> void:
 	_build_stats_panel()
 	_build_region_panel()
 	_build_region_event_panel()
+	_build_field_action_panel()
 	_build_tutorial_panel()
 	_build_offline_panel()
 
@@ -339,6 +348,40 @@ func _build_region_event_panel() -> void:
 	content.add_child(_make_button("나중에 결정", _hide_region_event, Color("#5d486f")))
 
 
+func _build_field_action_panel() -> void:
+	field_action_panel = PanelContainer.new()
+	field_action_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.035, 0.03, 0.055, 0.99), 16)
+	)
+	field_action_panel.hide()
+	add_child(field_action_panel)
+	var margin: MarginContainer = _make_margin(18)
+	field_action_panel.add_child(margin)
+	var content: VBoxContainer = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	margin.add_child(content)
+	field_action_title = _make_label("", 24, Color("#ffd969"))
+	field_action_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(field_action_title)
+	field_action_description = _make_label("", 15, Color("#e6e1ed"))
+	field_action_description.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	field_action_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(field_action_description)
+	field_action_view = DotActionView.new()
+	field_action_view.custom_minimum_size = Vector2(0.0, 280.0)
+	field_action_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	field_action_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	field_action_view.status_changed.connect(_on_field_action_status_changed)
+	field_action_view.action_completed.connect(_resolve_field_action)
+	content.add_child(field_action_view)
+	field_action_status = _make_label("", 14, Color("#bcd8d4"))
+	field_action_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	field_action_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(field_action_status)
+	content.add_child(_make_button("현장에서 나가기", _hide_field_action, Color("#5d486f")))
+
+
 func _build_tutorial_panel() -> void:
 	tutorial_panel = PanelContainer.new()
 	tutorial_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.07, 0.055, 0.09, 0.98), 16))
@@ -435,6 +478,21 @@ func _refresh_all() -> void:
 		else "지역 사건"
 	)
 	region_event_button.disabled = event_cooldown > 0
+	var field_action: Dictionary = GameManager.get_current_field_action()
+	var field_cooldown: int = GameManager.get_field_action_cooldown()
+	if field_action.is_empty():
+		field_action_button.text = "현장 행동 없음"
+		field_action_button.disabled = true
+	elif field_cooldown > 0:
+		field_action_button.text = "현장 행동 %d초" % field_cooldown
+		field_action_button.disabled = true
+	else:
+		field_action_button.text = (
+			"현장 행동 · 재도전"
+			if GameManager.is_current_field_action_completed()
+			else "현장 행동 · 새 발견"
+		)
+		field_action_button.disabled = false
 
 	var reward: Dictionary = GameManager.get_next_reward_summary()
 	var reward_current: float = _dictionary_float(reward, "current", 0.0)
@@ -496,6 +554,7 @@ func _update_responsive_layout() -> void:
 	_place_modal(stats_panel, Vector2(430.0, 380.0))
 	_place_modal(region_panel, Vector2(540.0, 500.0))
 	_place_modal(region_event_panel, Vector2(560.0, 390.0))
+	_place_modal(field_action_panel, Vector2(620.0, 620.0))
 	_place_modal(tutorial_panel, Vector2(480.0, 280.0))
 	_place_modal(offline_panel, Vector2(480.0, 260.0))
 	_place_modal(discovery_panel, Vector2(520.0, 150.0))
@@ -607,6 +666,7 @@ func _show_stats() -> void:
 		+ "클릭 부스트: %d회\n"
 		+ "황금치즈 사건: %d회\n"
 		+ "발견한 지역 사건: %d개\n"
+		+ "완료한 현장 행동: %d개\n"
 		+ "현재 생산 보너스: %.2f배"
 	) % [
 		_format_number(GameManager.total_cheese),
@@ -615,6 +675,7 @@ func _show_stats() -> void:
 		GameManager.total_click_boosts,
 		GameManager.total_golden_events,
 		GameManager.completed_region_event_ids.size(),
+		GameManager.completed_field_action_ids.size(),
 		GameManager.get_stage_bonus()
 	]
 	stats_panel.show()
@@ -643,13 +704,20 @@ func _show_regions() -> void:
 			if discovered
 			else "사건: 미발견"
 		)
+		var action_title: String = _dictionary_string(entry, "action_title", "")
+		var action_text: String = ""
+		if not action_title.is_empty():
+			action_text = " · 행동 %s" % (
+				"완료" if _dictionary_bool(entry, "action_completed", false) else "미완료"
+			)
 		var button: Button = _make_button(
-			"%s%s · 자원 %s / 위험 %s\n%s" % [
+			"%s%s · 자원 %s / 위험 %s\n%s%s" % [
 				"[현재] " if current else "",
 				_dictionary_string(entry, "name", "지역"),
 				_dictionary_string(entry, "resource", "미확인"),
 				_dictionary_string(entry, "hazard", "미확인"),
-				event_text
+				event_text,
+				action_text
 			],
 			_select_region.bind(index),
 			Color("#49695f") if not current else Color("#6d5341")
@@ -726,6 +794,54 @@ func _resolve_region_event(choice_index: int) -> void:
 	)
 
 
+func _show_field_action() -> void:
+	var cooldown: int = GameManager.get_field_action_cooldown()
+	if cooldown > 0:
+		_show_toast("다음 현장 행동까지 %d초" % cooldown)
+		return
+	var action: Dictionary = GameManager.get_current_field_action()
+	if action.is_empty():
+		_show_toast("이 지역의 현장 행동은 다음 버전에서 열립니다.")
+		return
+	field_action_title.text = _dictionary_string(action, "title", "현장 행동")
+	field_action_description.text = _dictionary_string(
+		action,
+		"description",
+		"점의 움직임을 따라 상황을 해결하세요."
+	)
+	field_action_view.setup(action)
+	field_action_status.text = field_action_view.get_status_text()
+	field_action_panel.show()
+	field_action_panel.move_to_front()
+
+
+func _hide_field_action() -> void:
+	field_action_panel.hide()
+
+
+func _on_field_action_status_changed(status_text: String) -> void:
+	field_action_status.text = status_text
+
+
+func _resolve_field_action(action_id: String, mistakes: int) -> void:
+	var result: Dictionary = GameManager.resolve_field_action(action_id, mistakes)
+	if result.is_empty():
+		field_action_status.text = "완료 기록 실패 · 잠시 뒤 다시 시도하세요."
+		return
+	var first_completion: bool = _dictionary_bool(result, "first_completion", false)
+	field_action_status.text = "%s완료 · 실수 %d회 · 치즈 +%s" % [
+		"첫 발견! " if first_completion else "",
+		_dictionary_int(result, "mistakes", 0),
+		_format_number(_dictionary_float(result, "reward", 0.0))
+	]
+	_show_toast(
+		"%s 완료 · 치즈 +%s" % [
+			_dictionary_string(result, "title", "현장 행동"),
+			_format_number(_dictionary_float(result, "reward", 0.0))
+		]
+	)
+
+
 func _show_tutorial() -> void:
 	tutorial_text.text = GameManager.get_tutorial_text()
 	tutorial_panel.show()
@@ -773,6 +889,7 @@ func _show_toast(message: String) -> void:
 
 
 func _on_stage_changed(_stage_index: int) -> void:
+	field_action_panel.hide()
 	_refresh_all()
 
 

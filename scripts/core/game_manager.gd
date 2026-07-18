@@ -17,6 +17,7 @@ const GOLDEN_EVENT_MIN_DELAY: float = 35.0
 const GOLDEN_EVENT_MAX_DELAY: float = 65.0
 const ESTIMATED_ONE_WAY_DISTANCE: float = 760.0
 const REGION_EVENT_COOLDOWN_SECONDS: int = 30
+const FIELD_ACTION_COOLDOWN_SECONDS: int = 20
 
 var cheese: float = 0.0
 var total_cheese: float = 0.0
@@ -29,6 +30,8 @@ var highest_unlocked_stage_index: int = 0
 var unlocked_stage_ids: Array[String] = []
 var completed_region_event_ids: Array[String] = []
 var next_region_event_unix: int = 0
+var completed_field_action_ids: Array[String] = []
+var next_field_action_unix: int = 0
 var tutorial_step: int = 0
 var golden_remaining: float = 0.0
 var click_boost_remaining: float = 0.0
@@ -247,6 +250,8 @@ func get_region_codex_entries() -> Array[Dictionary]:
 		var stage: Dictionary = unlocked_stages[index]
 		var region_event: Dictionary = _dictionary_dictionary(stage, "choice_event")
 		var event_id: String = _dictionary_string(region_event, "id", "")
+		var field_action: Dictionary = _dictionary_dictionary(stage, "field_action")
+		var action_id: String = _dictionary_string(field_action, "id", "")
 		result.append({
 			"stage_index": index,
 			"stage_id": _dictionary_string(stage, "id", ""),
@@ -255,6 +260,11 @@ func get_region_codex_entries() -> Array[Dictionary]:
 			"hazard": _dictionary_string(stage, "hazard", "미확인 위험"),
 			"event_title": _dictionary_string(region_event, "title", "미확인 사건"),
 			"discovered": completed_region_event_ids.has(event_id),
+			"action_title": _dictionary_string(field_action, "title", ""),
+			"action_completed": (
+				not action_id.is_empty()
+				and completed_field_action_ids.has(action_id)
+			),
 			"current": index == current_stage_index
 		})
 	return result
@@ -379,6 +389,58 @@ func is_current_region_event_discovered() -> bool:
 	var region_event: Dictionary = get_current_region_event()
 	var event_id: String = _dictionary_string(region_event, "id", "")
 	return not event_id.is_empty() and completed_region_event_ids.has(event_id)
+
+
+func get_current_field_action() -> Dictionary:
+	var stage: Dictionary = get_current_stage()
+	return _dictionary_dictionary(stage, "field_action").duplicate(true)
+
+
+func get_field_action_cooldown() -> int:
+	return maxi(0, next_field_action_unix - TimeManager.current_unix_time())
+
+
+func is_current_field_action_completed() -> bool:
+	var action: Dictionary = get_current_field_action()
+	var action_id: String = _dictionary_string(action, "id", "")
+	return not action_id.is_empty() and completed_field_action_ids.has(action_id)
+
+
+func resolve_field_action(action_id: String, mistakes: int) -> Dictionary:
+	if get_field_action_cooldown() > 0:
+		return {}
+	var action: Dictionary = get_current_field_action()
+	if action.is_empty():
+		return {}
+	var current_action_id: String = _dictionary_string(action, "id", "")
+	if action_id.is_empty() or action_id != current_action_id:
+		return {}
+	var first_completion: bool = not completed_field_action_ids.has(action_id)
+	var reward_trips: int = maxi(1, _dictionary_int(action, "reward_trips", 1))
+	var first_reward_trips: int = 0
+	if first_completion:
+		first_reward_trips = maxi(
+			0,
+			_dictionary_int(action, "first_completion_reward_trips", 0)
+		)
+		completed_field_action_ids.append(action_id)
+	var base_reward: int = _calculate_trip_reward(get_carry_capacity() * reward_trips)
+	var reward: int = collect_trip(
+		get_carry_capacity() * (reward_trips + first_reward_trips)
+	)
+	next_field_action_unix = (
+		TimeManager.current_unix_time() + FIELD_ACTION_COOLDOWN_SECONDS
+	)
+	EventBus.game_state_changed.emit()
+	save_now()
+	return {
+		"action_id": action_id,
+		"title": _dictionary_string(action, "title", "현장 행동"),
+		"reward": reward,
+		"first_completion": first_completion,
+		"first_completion_reward": maxi(0, reward - base_reward),
+		"mistakes": maxi(0, mistakes)
+	}
 
 
 func get_colony_rank() -> String:
@@ -596,6 +658,8 @@ func _default_save_data() -> Dictionary:
 		"unlocked_stage_ids": [],
 		"completed_region_event_ids": [],
 		"next_region_event_unix": 0,
+		"completed_field_action_ids": [],
+		"next_field_action_unix": 0,
 		"tutorial_step": 0,
 		"play_time_seconds": 0.0,
 		"total_trips": 0,
@@ -630,6 +694,14 @@ func _apply_save_data(data: Dictionary) -> void:
 		0,
 		_dictionary_int(data, "next_region_event_unix", 0)
 	)
+	completed_field_action_ids = _dictionary_string_array(
+		data,
+		"completed_field_action_ids"
+	)
+	next_field_action_unix = maxi(
+		0,
+		_dictionary_int(data, "next_field_action_unix", 0)
+	)
 	tutorial_step = clampi(_dictionary_int(data, "tutorial_step", 0), 0, 4)
 	play_time_seconds = maxf(0.0, _dictionary_float(data, "play_time_seconds", 0.0))
 	total_trips = maxi(0, _dictionary_int(data, "total_trips", 0))
@@ -651,6 +723,8 @@ func _build_save_data() -> Dictionary:
 		"unlocked_stage_ids": unlocked_stage_ids.duplicate(),
 		"completed_region_event_ids": completed_region_event_ids.duplicate(),
 		"next_region_event_unix": next_region_event_unix,
+		"completed_field_action_ids": completed_field_action_ids.duplicate(),
+		"next_field_action_unix": next_field_action_unix,
 		"tutorial_step": tutorial_step,
 		"play_time_seconds": play_time_seconds,
 		"total_trips": total_trips,

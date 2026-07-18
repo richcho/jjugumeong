@@ -20,6 +20,9 @@ func _run_tests() -> void:
 	_test_region_selection()
 	_test_region_codex()
 	_test_region_events()
+	_test_field_action_data()
+	_test_field_action_resolution()
+	_test_dot_action_input()
 	_test_reward_text_bounds()
 	_test_stage_backgrounds()
 	_test_stage_choice_events()
@@ -48,9 +51,9 @@ func _test_time_cap() -> void:
 func _test_build_info() -> void:
 	_expect_true(GameManager.display_name == "쥐구멍", "build display name")
 	_expect_true(GameManager.product_name == "r4", "build product name")
-	_expect_true(GameManager.build_version == "0.3.1", "build version")
+	_expect_true(GameManager.build_version == "0.3.2", "build version")
 	_expect_true(GameManager.build_phase == "V0.3 Alpha", "build phase")
-	_expect_true(GameManager.get_build_label() == "r4 0.3.1", "build label")
+	_expect_true(GameManager.get_build_label() == "r4 0.3.2", "build label")
 
 
 func _test_save_schema_migration() -> void:
@@ -67,7 +70,9 @@ func _test_save_schema_migration() -> void:
 		"selected_stage_index": 0,
 		"unlocked_stage_ids": [],
 		"completed_region_event_ids": [],
-		"next_region_event_unix": 0
+		"next_region_event_unix": 0,
+		"completed_field_action_ids": [],
+		"next_field_action_unix": 0
 	}
 	var migrated_value: Variant = SaveManager.call("_migrate_data", legacy, defaults)
 	_expect_true(migrated_value is Dictionary, "schema 1 migration result type")
@@ -76,7 +81,7 @@ func _test_save_schema_migration() -> void:
 		var migrated: Dictionary = migrated_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(migrated, "schema_version", 0),
-			2,
+			3,
 			"schema migration version"
 		)
 		_expect_equal_int(
@@ -85,6 +90,40 @@ func _test_save_schema_migration() -> void:
 			"schema migration selected stage"
 		)
 		_expect_dictionary_float(migrated, "cheese", 123.0, "schema migration cheese")
+		_expect_equal_int(
+			_dictionary_array_size(migrated, "completed_field_action_ids"),
+			0,
+			"schema migration field actions"
+		)
+	var schema_two: Dictionary = {
+		"schema_version": 2,
+		"selected_stage_index": 1,
+		"completed_region_event_ids": ["kitchen_cat_patrol"]
+	}
+	var schema_two_value: Variant = SaveManager.call(
+		"_migrate_data",
+		schema_two,
+		defaults
+	)
+	_expect_true(schema_two_value is Dictionary, "schema 2 migration result type")
+	if schema_two_value is Dictionary:
+		@warning_ignore("unsafe_cast")
+		var schema_two_migrated: Dictionary = schema_two_value as Dictionary
+		_expect_equal_int(
+			_dictionary_int(schema_two_migrated, "schema_version", 0),
+			3,
+			"schema 2 migration version"
+		)
+		_expect_equal_int(
+			_dictionary_int(schema_two_migrated, "selected_stage_index", -1),
+			1,
+			"schema 2 selected stage preserved"
+		)
+		_expect_equal_int(
+			_dictionary_array_size(schema_two_migrated, "completed_field_action_ids"),
+			0,
+			"schema 2 field actions initialized"
+		)
 
 
 func _test_upgrade_costs() -> void:
@@ -365,6 +404,167 @@ func _test_region_events() -> void:
 	GameManager.click_boost_remaining = previous_boost
 
 
+func _test_field_action_data() -> void:
+	var action_types: Array[String] = []
+	var action_ids: Array[String] = []
+	for stage_index: int in range(GameManager.stages.size()):
+		var stage: Dictionary = GameManager.stages[stage_index]
+		var action_value: Variant = stage.get("field_action", {})
+		if stage_index >= 3:
+			var later_action_empty: bool = false
+			if action_value is Dictionary:
+				@warning_ignore("unsafe_cast")
+				var later_action: Dictionary = action_value as Dictionary
+				later_action_empty = later_action.is_empty()
+			_expect_true(later_action_empty, "later region field action remains out of scope")
+			continue
+		_expect_true(action_value is Dictionary, "field action data type")
+		if not action_value is Dictionary:
+			continue
+		@warning_ignore("unsafe_cast")
+		var action: Dictionary = action_value as Dictionary
+		var action_id: String = _dictionary_string(action, "id", "")
+		var action_type: String = _dictionary_string(action, "type", "")
+		_expect_true(not action_id.is_empty(), "field action id")
+		_expect_true(not action_ids.has(action_id), "field action id is unique")
+		_expect_true(not action_types.has(action_type), "field action mechanic is unique")
+		_expect_equal_int(
+			_dictionary_int(action, "reward_trips", 0),
+			3,
+			"field action reward trips"
+		)
+		_expect_equal_int(
+			_dictionary_int(action, "first_completion_reward_trips", 0),
+			2,
+			"field action first completion trips"
+		)
+		action_ids.append(action_id)
+		action_types.append(action_type)
+	_expect_equal_int(action_ids.size(), 3, "field action prototype count")
+
+
+func _test_field_action_resolution() -> void:
+	var previous_stage_index: int = GameManager.current_stage_index
+	var previous_highest_index: int = GameManager.highest_unlocked_stage_index
+	var previous_cheese: float = GameManager.cheese
+	var previous_total_cheese: float = GameManager.total_cheese
+	var previous_carry_level: int = GameManager.carry_level
+	var previous_golden_remaining: float = GameManager.golden_remaining
+	var previous_total_trips: int = GameManager.total_trips
+	var previous_unlocked_ids: Array[String] = GameManager.unlocked_stage_ids.duplicate()
+	var previous_completed: Array[String] = GameManager.completed_field_action_ids.duplicate()
+	var previous_cooldown: int = GameManager.next_field_action_unix
+
+	GameManager.current_stage_index = 0
+	GameManager.highest_unlocked_stage_index = 0
+	GameManager.unlocked_stage_ids = ["old_kitchen"]
+	GameManager.cheese = 0.0
+	GameManager.total_cheese = 0.0
+	GameManager.carry_level = 0
+	GameManager.golden_remaining = 0.0
+	GameManager.completed_field_action_ids.clear()
+	GameManager.next_field_action_unix = 0
+	_expect_true(
+		GameManager.resolve_field_action("wrong_action", 0).is_empty(),
+		"wrong field action id is rejected"
+	)
+	var first_result: Dictionary = GameManager.resolve_field_action(
+		"kitchen_thread_tangle",
+		2
+	)
+	_expect_true(not first_result.is_empty(), "field action resolves")
+	_expect_true(
+		_dictionary_bool(first_result, "first_completion", false),
+		"field action first completion"
+	)
+	_expect_equal_int(
+		_dictionary_int(first_result, "reward", 0),
+		125,
+		"field action first reward"
+	)
+	_expect_equal_int(
+		_dictionary_int(first_result, "first_completion_reward", 0),
+		50,
+		"field action first bonus"
+	)
+	_expect_equal_int(
+		_dictionary_int(first_result, "mistakes", 0),
+		2,
+		"field action mistake result"
+	)
+	_expect_true(
+		GameManager.completed_field_action_ids.has("kitchen_thread_tangle"),
+		"field action completion recorded"
+	)
+	_expect_true(GameManager.get_field_action_cooldown() > 0, "field action cooldown")
+	_expect_true(
+		GameManager.resolve_field_action("kitchen_thread_tangle", 0).is_empty(),
+		"field action cooldown blocks repeat"
+	)
+
+	GameManager.current_stage_index = 0
+	GameManager.highest_unlocked_stage_index = 0
+	GameManager.unlocked_stage_ids = ["old_kitchen"]
+	GameManager.cheese = 0.0
+	GameManager.total_cheese = 0.0
+	GameManager.next_field_action_unix = 0
+	var repeat_result: Dictionary = GameManager.resolve_field_action(
+		"kitchen_thread_tangle",
+		0
+	)
+	_expect_true(
+		not _dictionary_bool(repeat_result, "first_completion", true),
+		"repeat field action is not first"
+	)
+	_expect_equal_int(
+		_dictionary_int(repeat_result, "reward", 0),
+		75,
+		"repeat field action base reward"
+	)
+
+	GameManager.current_stage_index = previous_stage_index
+	GameManager.highest_unlocked_stage_index = previous_highest_index
+	GameManager.cheese = previous_cheese
+	GameManager.total_cheese = previous_total_cheese
+	GameManager.carry_level = previous_carry_level
+	GameManager.golden_remaining = previous_golden_remaining
+	GameManager.total_trips = previous_total_trips
+	GameManager.unlocked_stage_ids = previous_unlocked_ids
+	GameManager.completed_field_action_ids = previous_completed
+	GameManager.next_field_action_unix = previous_cooldown
+
+
+func _test_dot_action_input() -> void:
+	for action_type: String in ["untangle", "tower", "infinite"]:
+		var action_view: DotActionView = DotActionView.new()
+		action_view.size = Vector2(500.0, 280.0)
+		action_view.setup({
+			"id": "test_%s" % action_type,
+			"type": action_type
+		})
+		_expect_true(
+			not action_view.submit_point(Vector2(-100.0, -100.0)),
+			"dot action wrong input: %s" % action_type
+		)
+		_expect_equal_int(action_view.mistakes, 1, "dot action mistake count")
+		var safety: int = 0
+		while not action_view.finished and safety < 12:
+			var target: Vector2 = action_view.get_active_target_position()
+			_expect_true(target != Vector2.ZERO, "dot action target: %s" % action_type)
+			_expect_true(
+				action_view.submit_point(target),
+				"dot action correct input: %s" % action_type
+			)
+			safety += 1
+		_expect_true(action_view.finished, "dot action completion: %s" % action_type)
+		_expect_equal_int(
+			action_view.step,
+			action_view.get_total_steps(),
+			"dot action completed step count"
+		)
+		action_view.free()
+
+
 func _test_reward_text_bounds() -> void:
 	var world_view: WorldView = WorldView.new()
 	var upper_left_value: Variant = world_view.call(
@@ -541,6 +741,8 @@ func _test_save_round_trip() -> void:
 		"unlocked_stage_ids": ["old_kitchen", "food_storage"],
 		"completed_region_event_ids": ["kitchen_cat_patrol"],
 		"next_region_event_unix": 0,
+		"completed_field_action_ids": ["kitchen_thread_tangle"],
+		"next_field_action_unix": 0,
 		"tutorial_step": 4,
 		"play_time_seconds": 99.0,
 		"total_trips": 12,
@@ -630,6 +832,25 @@ func _test_ui_layout() -> void:
 		not game_ui.region_progress_label.text.is_empty(),
 		"region codex progress text"
 	)
+	game_ui.call("_hide_regions")
+	var previous_stage_index: int = GameManager.current_stage_index
+	var previous_field_cooldown: int = GameManager.next_field_action_unix
+	GameManager.current_stage_index = 0
+	GameManager.next_field_action_unix = 0
+	game_ui.call("_show_field_action")
+	await get_tree().process_frame
+	_expect_true(game_ui.field_action_panel.visible, "portrait field action opens")
+	_expect_true(
+		game_ui.field_action_panel.get_global_rect().end.y <= host.size.y,
+		"portrait field action bottom bound"
+	)
+	_expect_true(
+		game_ui.field_action_view.action_type == "untangle",
+		"portrait field action mechanic"
+	)
+	game_ui.call("_hide_field_action")
+	GameManager.current_stage_index = previous_stage_index
+	GameManager.next_field_action_unix = previous_field_cooldown
 	GameManager.next_region_event_unix = previous_cooldown
 	host.queue_free()
 	await get_tree().process_frame
@@ -710,6 +931,15 @@ func _dictionary_int(data: Dictionary, key: String, fallback: int) -> int:
 		@warning_ignore("unsafe_call_argument")
 		return int(value)
 	return fallback
+
+
+func _dictionary_array_size(data: Dictionary, key: String) -> int:
+	var value: Variant = data.get(key, [])
+	if value is Array:
+		@warning_ignore("unsafe_cast")
+		var items: Array = value as Array
+		return items.size()
+	return -1
 
 
 func _dictionary_bool(data: Dictionary, key: String, fallback: bool) -> bool:

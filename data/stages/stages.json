@@ -19,6 +19,14 @@
         {"label": "순찰 전에 질주", "result": "짧은 틈을 노려 치즈를 싣고 빠르게 돌아왔습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
       ]
     },
+    "field_action": {
+      "id": "kitchen_thread_tangle",
+      "type": "untangle",
+      "title": "실타래 속 비밀길",
+      "description": "바느질 바구니에서 흘러나온 실이 통로를 막았습니다. 연결된 매듭을 따라 실을 풀어 길을 여세요.",
+      "reward_trips": 3,
+      "first_completion_reward_trips": 2
+    },
     "background_color": "#352a3b"
   },
   {
@@ -41,6 +49,14 @@
         {"label": "상자 위로 빠르게 통과", "result": "높은 길을 달려 경계 구역을 벗어났습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
       ]
     },
+    "field_action": {
+      "id": "storage_shelf_tower",
+      "type": "tower",
+      "title": "선반 철탑 오르기",
+      "description": "곡물 자루 위의 높은 선반에 안전 표식이 있습니다. 빛나는 발판을 밟아 꼭대기까지 올라가세요.",
+      "reward_trips": 3,
+      "first_completion_reward_trips": 2
+    },
     "background_color": "#26394a"
   },
   {
@@ -62,6 +78,14 @@
         {"label": "계산대 아래에서 대기", "result": "소리가 멎은 뒤 남은 과자를 안전하게 모았습니다.", "effect": "secure", "reward_trips": 2},
         {"label": "폐기 봉투를 먼저 선점", "result": "원정대가 봉투를 낚아채 빠른 귀환로를 열었습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
       ]
+    },
+    "field_action": {
+      "id": "store_infinite_aisle",
+      "type": "infinite",
+      "title": "무한 진열 통로",
+      "description": "거울과 냉장고 불빛이 끝없는 통로를 만들었습니다. 중앙 신호와 같은 색의 문을 찾아 빠져나오세요.",
+      "reward_trips": 3,
+      "first_completion_reward_trips": 2
     },
     "background_color": "#243f39"
   },

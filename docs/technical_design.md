@@ -22,6 +22,7 @@
 | `GatheringMouse` | 개별 쥐 이동과 운반 상태 | 전체 자원 잔액 |
 | `WorldView` | 배경, 자원, 경로와 월드 효과 | 구매와 저장 규칙 |
 | `GameUI` | 정보 표시, 버튼과 반응형 배치 | 게임 상태의 원본 |
+| `DotActionView` | 점 기반 행동 렌더링, 터치 판정과 진행 상태 | 보상과 영구 완료 기록 |
 
 상태 흐름:
 
@@ -58,7 +59,7 @@ GatheringMouse 귀환
 | 주 파일 | `user://savegame.json` |
 | 백업 | `user://savegame.backup.json` |
 | 임시 파일 | `user://savegame.tmp.json` |
-| 현재 스키마 | 2 |
+| 현재 스키마 | 3 |
 
 저장 순서:
 
@@ -88,6 +89,11 @@ Web에서는 `user://`의 IndexedDB 저장, `localStorage`, 소형 쿠키 백업
 `completed_region_event_ids`, `next_region_event_unix`를 추가합니다. 스키마 1의
 `current_stage_index`는 선택 지역으로 이관하고, 해금 목록은 누적 치즈와 지역
 데이터에서 안전하게 재구성합니다.
+
+스키마 3은 `completed_field_action_ids`와 `next_field_action_unix`를 추가합니다.
+스키마 2 이하 저장은 완료한 현장 행동 없음, 대기 시간 0으로 이관합니다. 입력
+진행은 일시적인 UI 상태이며 행동을 끝낸 뒤 `GameManager`가 보상과 완료 ID를
+함께 저장합니다.
 
 ## 5. 화면과 반응형 규칙
 
