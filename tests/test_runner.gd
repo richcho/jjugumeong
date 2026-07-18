@@ -11,6 +11,7 @@ func _run_tests() -> void:
 	_test_time_cap()
 	_test_upgrade_costs()
 	_test_golden_reward()
+	_test_colony_progression()
 	_test_reward_text_bounds()
 	_test_stage_backgrounds()
 	_test_background_anchor_alignment()
@@ -63,6 +64,22 @@ func _test_golden_reward() -> void:
 	_expect_equal_int(reward, 125, "alpha and golden cheese multipliers")
 	_expect_equal_float(GameManager.cheese, 125.0, "golden cheese balance")
 	GameManager.golden_remaining = 0.0
+
+
+func _test_colony_progression() -> void:
+	var previous_hole_level: int = GameManager.hole_level
+	GameManager.hole_level = 19
+	_expect_true(GameManager.get_colony_rank() == "치즈 마을", "colony rank before city")
+	var goal: Dictionary = GameManager.get_next_colony_goal()
+	var target_value: Variant = goal.get("target_level", 0)
+	_expect_true(target_value is int, "next colony milestone type")
+	@warning_ignore("unsafe_call_argument")
+	var target_level: int = int(target_value)
+	_expect_equal_int(target_level, 20, "next colony milestone")
+	GameManager.hole_level = 20
+	_expect_true(GameManager.get_colony_rank() == "쥐구멍 도시", "colony city rank")
+	_expect_true(not GameManager.get_world_news().is_empty(), "world news available")
+	GameManager.hole_level = previous_hole_level
 
 
 func _test_reward_text_bounds() -> void:

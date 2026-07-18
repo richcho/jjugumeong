@@ -223,6 +223,54 @@ func get_next_stage() -> Dictionary:
 	return stages[next_index]
 
 
+func get_world_news() -> String:
+	var stage: Dictionary = get_current_stage()
+	var news_items: Array = stage.get("world_events", [])
+	var life_items: Array = stage.get("daily_life", [])
+	var combined: Array[String] = []
+	for item: Variant in news_items:
+		if item is String:
+			combined.append(item)
+	for item: Variant in life_items:
+		if item is String:
+			combined.append(item)
+	if combined.is_empty():
+		return "정찰대가 다음 통로를 조사 중"
+	var news_index: int = int(play_time_seconds / 12.0) % combined.size()
+	return combined[news_index]
+
+
+func get_colony_rank() -> String:
+	if hole_level >= 35:
+		return "지하 연맹"
+	if hole_level >= 20:
+		return "쥐구멍 도시"
+	if hole_level >= 10:
+		return "치즈 마을"
+	if hole_level >= 5:
+		return "작은 군락"
+	return "첫 보금자리"
+
+
+func get_next_colony_goal() -> Dictionary:
+	var goals: Array[Dictionary] = [
+		{"previous_level": 0, "target_level": 5, "title": "공동 식탁", "description": "식사와 휴식 공간"},
+		{"previous_level": 5, "target_level": 10, "title": "새끼쥐 보육실", "description": "가족과 생활의 시작"},
+		{"previous_level": 10, "target_level": 20, "title": "지하 시장", "description": "지역 자원 교환"},
+		{"previous_level": 20, "target_level": 35, "title": "통로 의회", "description": "다섯 지역 대표 결성"},
+		{"previous_level": 35, "target_level": 50, "title": "도시 아래 왕국", "description": "다음 세계 원정 준비"}
+	]
+	for goal: Dictionary in goals:
+		if hole_level < _dictionary_int(goal, "target_level", hole_level + 1):
+			return goal
+	return {
+		"previous_level": 50,
+		"target_level": 75,
+		"title": "심층 세계 탐사",
+		"description": "미지의 지하 문명 발견"
+	}
+
+
 func get_expected_per_second() -> float:
 	var round_trip_seconds: float = (ESTIMATED_ONE_WAY_DISTANCE * 2.0) / get_move_speed()
 	var reward_per_trip: float = (

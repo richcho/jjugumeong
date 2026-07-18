@@ -97,7 +97,7 @@ func _build_interface() -> void:
 	var title_row: HBoxContainer = HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 14)
 	top_vbox.add_child(title_row)
-	title_label = _make_label("쥐구멍  R4 0.2.4", 25, Color("#ffd969"))
+	title_label = _make_label("쥐구멍  r4 0.2.4", 25, Color("#ffd969"))
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title_label)
 	save_label = _make_label("불러오는 중...", 14, Color("#afc9bd"))
@@ -338,10 +338,30 @@ func _refresh_all() -> void:
 
 	var next_stage: Dictionary = GameManager.get_next_stage()
 	if next_stage.is_empty():
-		next_stage_label.text = "초기 지역 전체 개방"
-		next_reward_title.text = "초기 지역 전체 개방"
-		next_reward_detail.text = "다음: 쥐구멍 확장"
-		next_reward_progress.value = 100.0
+		var colony_goal: Dictionary = GameManager.get_next_colony_goal()
+		var target_level: int = _dictionary_int(
+			colony_goal,
+			"target_level",
+			GameManager.hole_level + 1
+		)
+		var previous_level: int = _dictionary_int(colony_goal, "previous_level", 0)
+		next_stage_label.text = "세계 소식 · %s" % GameManager.get_world_news()
+		next_reward_title.text = "%s · 다음: %s" % [
+			GameManager.get_colony_rank(),
+			str(colony_goal.get("title", "쥐 사회 확장"))
+		]
+		next_reward_detail.text = "쥐구멍 Lv.%d / %d · %s" % [
+			GameManager.hole_level,
+			target_level,
+			str(colony_goal.get("description", "새 생활 공간 발견"))
+		]
+		next_reward_progress.value = clampf(
+			float(GameManager.hole_level - previous_level)
+			/ float(maxi(1, target_level - previous_level))
+			* 100.0,
+			0.0,
+			100.0
+		)
 	else:
 		var current_threshold: float = _dictionary_float(stage, "unlock_total_cheese", 0.0)
 		var target_threshold: float = _dictionary_float(next_stage, "unlock_total_cheese", 0.0)
@@ -641,6 +661,13 @@ func _dictionary_float(data: Dictionary, key: String, fallback: float) -> float:
 	if value is int:
 		@warning_ignore("unsafe_call_argument")
 		return float(value)
+	return fallback
+
+
+func _dictionary_int(data: Dictionary, key: String, fallback: int) -> int:
+	var value: Variant = data.get(key, fallback)
+	if value is int:
+		return value
 	return fallback
 
 
