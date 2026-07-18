@@ -97,7 +97,7 @@ func _build_interface() -> void:
 	var title_row: HBoxContainer = HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 14)
 	top_vbox.add_child(title_row)
-	title_label = _make_label("쥐구멍  ALPHA 0.2.2", 25, Color("#ffd969"))
+	title_label = _make_label("쥐구멍  ALPHA 0.2.3", 25, Color("#ffd969"))
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title_label)
 	save_label = _make_label("불러오는 중...", 14, Color("#afc9bd"))

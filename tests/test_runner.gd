@@ -247,6 +247,7 @@ func _test_mouse_round_trip() -> void:
 	mouse_node.configure(Vector2.ZERO, Vector2(10.0, 0.0), 0.0, 0)
 	await get_tree().create_timer(0.3).timeout
 	_expect_true(GameManager.cheese >= 1.0, "automatic mouse round trip")
+	_expect_true(mouse_node.walk_phase > 0.0, "mouse walk animation advances")
 	mouse_node.queue_free()
 
 
