@@ -156,25 +156,17 @@ func _draw() -> void:
 	var stride_wave: float = sin(walk_phase)
 	var lift: float = absf(stride_wave)
 	var carrying_weight: float = 0.72 if carrying else 1.0
-	var bob_offset: float = -lift * 3.2 * carrying_weight + _landing_squash * 1.8
-	var body_rotation: float = stride_wave * 0.035 * carrying_weight
+	var bob_offset: float = -lift * 1.4 * carrying_weight + _landing_squash * 1.2
+	var body_rotation: float = stride_wave * 0.012 * carrying_weight
 	var body_scale: Vector2 = Vector2(
-		1.0 + lift * 0.025 - _landing_squash * 0.035,
-		1.0 - lift * 0.045 + _landing_squash * 0.065
+		1.0 + lift * 0.012 - _landing_squash * 0.025,
+		1.0 - lift * 0.022 + _landing_squash * 0.045
 	)
 	_draw_ground_shadow(lift)
-	_draw_dust_puff()
 	_draw_foot_contacts(stride_wave)
 	draw_set_transform(Vector2(0.0, bob_offset), body_rotation, body_scale)
 	var active_texture: Texture2D = CARRYING_TEXTURE if carrying else MOUSE_TEXTURE
 	draw_texture_rect(active_texture, Rect2(Vector2(-39.0, -53.0), Vector2(78.0, 53.0)), false)
-	if GameManager.speed_level >= 1:
-		draw_line(Vector2(-4.0, -28.0), Vector2(-19.0, -19.0), Color("#e45f6f"), 4.0, true)
-		draw_line(Vector2(-17.0, -20.0), Vector2(-27.0, -25.0), Color("#f28b78"), 3.0, true)
-	if GameManager.carry_level >= 1:
-		var bag_color: Color = Color("#b98550") if GameManager.carry_level < 3 else Color("#537e8c")
-		draw_rect(Rect2(Vector2(-12.0, -34.0), Vector2(15.0, 17.0)), bag_color, true)
-		draw_arc(Vector2(-4.5, -33.0), 8.0, PI, TAU, 12, Color("#e7c18a"), 2.0, true)
 	draw_set_transform(Vector2.ZERO)
 
 
@@ -197,7 +189,7 @@ func _draw_dust_puff() -> void:
 
 
 func _draw_foot_contacts(stride_wave: float) -> void:
-	var front_alpha: float = clampf(stride_wave, 0.0, 1.0) * 0.32
-	var back_alpha: float = clampf(-stride_wave, 0.0, 1.0) * 0.32
+	var front_alpha: float = clampf(stride_wave, 0.0, 1.0) * 0.18
+	var back_alpha: float = clampf(-stride_wave, 0.0, 1.0) * 0.18
 	draw_line(Vector2(12.0, 0.0), Vector2(23.0, 0.0), Color(0.12, 0.08, 0.08, front_alpha), 2.0, true)
 	draw_line(Vector2(-20.0, 0.0), Vector2(-9.0, 0.0), Color(0.12, 0.08, 0.08, back_alpha), 2.0, true)

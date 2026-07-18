@@ -16,21 +16,21 @@ const STAGE_HOLE_ANCHORS: Array[Vector2] = [
 	Vector2(120.0, 500.0),
 	Vector2(205.0, 495.0),
 	Vector2(155.0, 495.0),
-	Vector2(175.0, 470.0)
+	Vector2(215.0, 540.0)
 ]
 const STAGE_RESOURCE_ANCHORS: Array[Vector2] = [
 	Vector2(1110.0, 470.0),
 	Vector2(1115.0, 475.0),
 	Vector2(1100.0, 490.0),
 	Vector2(1110.0, 485.0),
-	Vector2(1080.0, 475.0)
+	Vector2(1050.0, 545.0)
 ]
 static var STAGE_ROUTE_CONTROLS: Array[PackedVector2Array] = [
 	PackedVector2Array([Vector2(390.0, 470.0), Vector2(700.0, 430.0), Vector2(930.0, 455.0)]),
 	PackedVector2Array([Vector2(350.0, 490.0), Vector2(650.0, 440.0), Vector2(930.0, 455.0)]),
 	PackedVector2Array([Vector2(370.0, 500.0), Vector2(650.0, 450.0), Vector2(920.0, 470.0)]),
 	PackedVector2Array([Vector2(360.0, 520.0), Vector2(650.0, 455.0), Vector2(910.0, 475.0)]),
-	PackedVector2Array([Vector2(370.0, 485.0), Vector2(650.0, 435.0), Vector2(900.0, 455.0)])
+	PackedVector2Array([Vector2(390.0, 555.0), Vector2(650.0, 520.0), Vector2(890.0, 535.0)])
 ]
 const MAX_LANE_ROWS: int = 7
 const REWARD_FONT_SIZE: int = 22
@@ -100,7 +100,6 @@ func _draw() -> void:
 			draw_circle(marker_position, 3.0, Color(1.0, 0.9, 0.56, 0.48))
 
 	_draw_mouse_hole()
-	_draw_resident_mice()
 	_draw_cheese_resource()
 
 	for effect: Dictionary in _effects:
@@ -167,7 +166,6 @@ func _draw_atmosphere(viewport_size: Vector2) -> void:
 
 func _draw_mouse_hole() -> void:
 	if GameManager.current_stage_index < STAGE_BACKGROUNDS.size():
-		_draw_embedded_hole_progress()
 		return
 	var hole_scale: float = 1.0 + minf(float(GameManager.hole_level - 1) * 0.07, 0.55)
 	draw_circle(hole_position + Vector2(0.0, 10.0), 62.0 * hole_scale, Color(0.07, 0.04, 0.08, 0.78))
@@ -210,12 +208,6 @@ func _draw_embedded_hole_progress() -> void:
 
 func _draw_cheese_resource() -> void:
 	if GameManager.current_stage_index < STAGE_BACKGROUNDS.size():
-		var glow_color: Color = Color(1.0, 0.76, 0.18, 0.14)
-		if GameManager.golden_remaining > 0.0:
-			glow_color = Color(1.0, 0.9, 0.32, 0.32)
-		var glow_radius: float = 34.0 + sin(float(Time.get_ticks_msec()) * 0.008) * 4.0
-		draw_circle(resource_position, glow_radius, glow_color)
-		draw_arc(resource_position, glow_radius, 0.0, TAU, 28, Color(1.0, 0.88, 0.42, 0.55), 3.0, true)
 		return
 	var cheese_color: Color = Color("#ffd35a")
 	if GameManager.golden_remaining > 0.0:
