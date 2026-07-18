@@ -3,6 +3,14 @@ extends Node2D
 
 signal reward_delivered(world_position: Vector2, amount: int)
 
+enum ActivityState {
+	TRAVELING,
+	LOADING,
+	ENTERING_HOLE,
+	RESTING,
+	LEAVING_HOLE
+}
+
 const MOUSE_TEXTURE: Texture2D = preload("res://assets/mouse/sprites/field_mouse-v2.png")
 const CARRYING_TEXTURE: Texture2D = preload(
 	"res://assets/mouse/sprites/field_mouse_carrying-v2.png"
@@ -13,11 +21,14 @@ var resource_position: Vector2 = Vector2.ZERO
 var lane_offset: float = 0.0
 var route_points: PackedVector2Array = PackedVector2Array()
 var route_progress: float = 0.0
+var represented_workers: int = 1
 var outbound: bool = true
 var carrying: bool = false
 var visual_index: int = 0
 var walk_phase: float = 0.0
 var _landing_squash: float = 0.0
+var _activity_state: ActivityState = ActivityState.TRAVELING
+var _activity_remaining: float = 0.0
 
 
 func configure(start_position: Vector2, target_position: Vector2, offset: float, index: int) -> void:
@@ -42,16 +53,20 @@ func configure_route(
 	points: PackedVector2Array,
 	offset: float,
 	index: int,
-	initial_progress: float
+	initial_progress: float,
+	worker_group_size: int
 ) -> void:
 	route_points = points
 	lane_offset = offset
 	visual_index = index
 	route_progress = clampf(initial_progress, 0.0, 0.92)
+	represented_workers = maxi(1, worker_group_size)
 	outbound = true
 	carrying = false
 	walk_phase = float(index) * 1.7
 	_landing_squash = 0.0
+	_activity_state = ActivityState.TRAVELING
+	_activity_remaining = 0.0
 	position = _route_position(route_progress)
 	queue_redraw()
 
@@ -95,6 +110,9 @@ func _process(delta: float) -> void:
 
 
 func _process_perspective_route(delta: float) -> void:
+	if _activity_state != ActivityState.TRAVELING:
+		_process_activity(delta)
+		return
 	var previous_position: Vector2 = position
 	var progress_delta: float = (
 		GameManager.get_move_speed() * delta / maxf(_route_length(), 1.0)
@@ -111,16 +129,59 @@ func _process_perspective_route(delta: float) -> void:
 		_landing_squash = 1.0
 		outbound = false
 		carrying = true
+		_activity_state = ActivityState.LOADING
+		_activity_remaining = 0.65 + float(visual_index % 4) * 0.18
 	elif reached_hole:
 		_landing_squash = 1.0
-		var reward: int = GameManager.collect_trip(GameManager.get_carry_capacity())
+		var group_capacity: int = GameManager.get_carry_capacity() * represented_workers
+		var reward: int = GameManager.collect_trip(group_capacity)
 		reward_delivered.emit(position, reward)
-		outbound = true
-		carrying = false
+		_activity_state = ActivityState.ENTERING_HOLE
+		_activity_remaining = 0.42
 
 	var direction_sign: float = 1.0 if outbound else -1.0
 	var perspective_scale: float = _route_perspective_scale(route_progress)
 	scale = Vector2(direction_sign * perspective_scale, perspective_scale)
+	queue_redraw()
+
+
+func _process_activity(delta: float) -> void:
+	_activity_remaining -= delta
+	match _activity_state:
+		ActivityState.LOADING:
+			var sniff: float = sin(float(Time.get_ticks_msec()) * 0.012 + float(visual_index))
+			rotation = sniff * 0.018
+			if _activity_remaining <= 0.0:
+				rotation = 0.0
+				_activity_state = ActivityState.TRAVELING
+		ActivityState.ENTERING_HOLE:
+			var enter_ratio: float = clampf(_activity_remaining / 0.42, 0.0, 1.0)
+			scale = Vector2(-enter_ratio, enter_ratio)
+			modulate.a = enter_ratio
+			if _activity_remaining <= 0.0:
+				visible = false
+				_activity_state = ActivityState.RESTING
+				_activity_remaining = 2.4 + float((visual_index * 7) % 6) * 0.65
+		ActivityState.RESTING:
+			if _activity_remaining <= 0.0:
+				visible = true
+				modulate.a = 0.0
+				outbound = true
+				carrying = false
+				route_progress = 0.0
+				position = _route_position(0.0)
+				_activity_state = ActivityState.LEAVING_HOLE
+				_activity_remaining = 0.48
+		ActivityState.LEAVING_HOLE:
+			var leave_ratio: float = clampf(1.0 - _activity_remaining / 0.48, 0.0, 1.0)
+			scale = Vector2(leave_ratio, leave_ratio)
+			modulate.a = leave_ratio
+			if _activity_remaining <= 0.0:
+				modulate.a = 1.0
+				scale = Vector2.ONE
+				_activity_state = ActivityState.TRAVELING
+		_:
+			_activity_state = ActivityState.TRAVELING
 	queue_redraw()
 
 

@@ -33,6 +33,7 @@ static var STAGE_ROUTE_CONTROLS: Array[PackedVector2Array] = [
 	PackedVector2Array([Vector2(390.0, 555.0), Vector2(650.0, 520.0), Vector2(890.0, 535.0)])
 ]
 const MAX_LANE_ROWS: int = 7
+const MAX_VISIBLE_WORK_GROUPS: int = 6
 const REWARD_FONT_SIZE: int = 22
 const REWARD_SIDE_MARGIN: float = 24.0
 const REWARD_TOP_MARGIN: float = 165.0
@@ -301,23 +302,28 @@ func _rebuild_mice(count: int) -> void:
 		mouse_node.queue_free()
 	_mouse_nodes.clear()
 
-	for index: int in range(count):
+	var visible_group_count: int = mini(count, MAX_VISIBLE_WORK_GROUPS)
+	for index: int in range(visible_group_count):
 		var instance: Node = MOUSE_SCENE.instantiate()
 		var mouse_node: GatheringMouse = instance as GatheringMouse
 		add_child(mouse_node)
 		var lane_row: int = index % MAX_LANE_ROWS
-		var mice_in_first_group: int = mini(count, MAX_LANE_ROWS)
+		var mice_in_first_group: int = mini(visible_group_count, MAX_LANE_ROWS)
 		var centered_lane: float = (
 			float(lane_row)
 			- float(mice_in_first_group - 1) * 0.5
 		)
 		var lane_offset: float = centered_lane * 4.0
 		var initial_progress: float = fposmod(float(index) * 0.13, 0.88)
+		var worker_group_size: int = count / visible_group_count
+		if index < count % visible_group_count:
+			worker_group_size += 1
 		mouse_node.configure_route(
 			_route_points,
 			lane_offset,
 			index,
-			initial_progress
+			initial_progress,
+			worker_group_size
 		)
 		mouse_node.reward_delivered.connect(_on_reward_delivered)
 		_mouse_nodes.append(mouse_node)
