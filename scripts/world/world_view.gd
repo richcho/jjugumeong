@@ -3,6 +3,11 @@ extends Node2D
 
 const MOUSE_SCENE: PackedScene = preload("res://scenes/mouse/mouse.tscn")
 const GAME_FONT: FontFile = preload("res://assets/fonts/NotoSansKR-Subset.ttf")
+const STAGE_BACKGROUNDS: Array[Texture2D] = [
+	preload("res://assets/background/stages/old_kitchen.jpg"),
+	preload("res://assets/background/stages/food_storage.jpg"),
+	preload("res://assets/background/stages/convenience_store.jpg")
+]
 const MAX_LANE_ROWS: int = 7
 const REWARD_FONT_SIZE: int = 22
 const REWARD_SIDE_MARGIN: float = 24.0
@@ -57,14 +62,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _draw() -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
-	draw_rect(Rect2(Vector2.ZERO, viewport_size), _stage_color)
-
-	var floor_top: float = viewport_size.y * 0.67
-	draw_rect(Rect2(0.0, floor_top, viewport_size.x, viewport_size.y - floor_top), Color("#211b26"))
-	draw_line(hole_position, resource_position, Color(0.82, 0.72, 0.54, 0.22), 5.0, true)
+	_draw_stage_background(viewport_size)
+	_draw_atmosphere(viewport_size)
+	draw_line(hole_position, resource_position, Color(1.0, 0.82, 0.42, 0.28), 6.0, true)
 	for marker_index: int in range(1, 8):
 		var marker_position: Vector2 = hole_position.lerp(resource_position, float(marker_index) / 8.0)
-		draw_circle(marker_position, 3.0, Color(0.95, 0.86, 0.67, 0.35))
+		draw_circle(marker_position, 3.5, Color(1.0, 0.9, 0.56, 0.48))
 
 	_draw_mouse_hole()
 	_draw_cheese_resource()
@@ -92,11 +95,71 @@ func _draw() -> void:
 		)
 
 
+func _draw_stage_background(viewport_size: Vector2) -> void:
+	if GameManager.current_stage_index < STAGE_BACKGROUNDS.size():
+		var background: Texture2D = STAGE_BACKGROUNDS[GameManager.current_stage_index]
+		var texture_size: Vector2 = background.get_size()
+		var source_rect: Rect2 = Rect2(Vector2.ZERO, texture_size)
+		var viewport_aspect: float = viewport_size.x / maxf(1.0, viewport_size.y)
+		var texture_aspect: float = texture_size.x / maxf(1.0, texture_size.y)
+		if viewport_aspect > texture_aspect:
+			var source_height: float = texture_size.x / viewport_aspect
+			source_rect.position.y = (texture_size.y - source_height) * 0.5
+			source_rect.size.y = source_height
+		else:
+			var source_width: float = texture_size.y * viewport_aspect
+			source_rect.position.x = (texture_size.x - source_width) * 0.5
+			source_rect.size.x = source_width
+		draw_texture_rect_region(
+			background,
+			Rect2(Vector2.ZERO, viewport_size),
+			source_rect
+		)
+		draw_rect(Rect2(Vector2.ZERO, viewport_size), Color(0.03, 0.02, 0.05, 0.18))
+	else:
+		draw_rect(Rect2(Vector2.ZERO, viewport_size), _stage_color)
+		var floor_top: float = viewport_size.y * 0.67
+		draw_rect(
+			Rect2(0.0, floor_top, viewport_size.x, viewport_size.y - floor_top),
+			Color("#211b26")
+		)
+
+
+func _draw_atmosphere(viewport_size: Vector2) -> void:
+	var elapsed: float = float(Time.get_ticks_msec()) * 0.001
+	var atmosphere_color: Color = Color("#ffd67a")
+	if GameManager.current_stage_index == 1:
+		atmosphere_color = Color("#a9d8ff")
+	elif GameManager.current_stage_index >= 2:
+		atmosphere_color = Color("#75f4e8")
+	for index: int in range(14):
+		var seed_value: float = float(index) * 81.7
+		var x_value: float = fposmod(seed_value + elapsed * (4.0 + float(index % 3)), viewport_size.x)
+		var y_value: float = 175.0 + fposmod(seed_value * 1.9, maxf(80.0, viewport_size.y - 390.0))
+		var pulse: float = 0.18 + sin(elapsed * 1.4 + float(index)) * 0.07
+		draw_circle(Vector2(x_value, y_value), 1.5 + float(index % 2), Color(
+			atmosphere_color.r,
+			atmosphere_color.g,
+			atmosphere_color.b,
+			pulse
+		))
+
+
 func _draw_mouse_hole() -> void:
 	var hole_scale: float = 1.0 + minf(float(GameManager.hole_level - 1) * 0.07, 0.55)
-	draw_circle(hole_position + Vector2(0.0, 10.0), 70.0 * hole_scale, Color("#1a151d"))
-	draw_circle(hole_position + Vector2(0.0, 12.0), 52.0 * hole_scale, Color("#09080b"))
-	draw_arc(hole_position + Vector2(0.0, 10.0), 72.0 * hole_scale, PI, TAU, 28, Color("#6b5546"), 8.0, true)
+	draw_circle(hole_position + Vector2(0.0, 10.0), 62.0 * hole_scale, Color(0.07, 0.04, 0.08, 0.78))
+	draw_circle(hole_position + Vector2(0.0, 12.0), 43.0 * hole_scale, Color(0.02, 0.015, 0.025, 0.9))
+	draw_arc(hole_position + Vector2(0.0, 10.0), 64.0 * hole_scale, PI, TAU, 28, Color("#8b6849"), 8.0, true)
+	if GameManager.hole_level >= 2:
+		draw_line(hole_position + Vector2(-52.0, 50.0), hole_position + Vector2(-52.0, -20.0), Color("#a7794d"), 8.0, true)
+		draw_line(hole_position + Vector2(52.0, 50.0), hole_position + Vector2(52.0, -20.0), Color("#a7794d"), 8.0, true)
+	if GameManager.hole_level >= 3:
+		draw_rect(Rect2(hole_position + Vector2(-70.0, 48.0), Vector2(140.0, 8.0)), Color("#c09155"))
+		for item_index: int in range(4):
+			draw_circle(hole_position + Vector2(-45.0 + float(item_index) * 30.0, 38.0), 7.0, Color("#f0bd45"))
+	if GameManager.hole_level >= 4:
+		draw_circle(hole_position + Vector2(0.0, -62.0), 12.0, Color(1.0, 0.72, 0.2, 0.32))
+		draw_circle(hole_position + Vector2(0.0, -62.0), 5.0, Color("#ffd879"))
 	draw_string(
 		GAME_FONT,
 		hole_position + Vector2(-54.0, 103.0),

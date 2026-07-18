@@ -12,15 +12,17 @@ func _run_tests() -> void:
 	_test_upgrade_costs()
 	_test_golden_reward()
 	_test_reward_text_bounds()
+	_test_stage_backgrounds()
 	_test_korean_font()
 	_test_save_round_trip()
+	await _test_ui_layout()
 	await _test_mouse_round_trip()
 
 	if _failures == 0:
-		print("JJUGUMEONG V0.1 tests: PASS")
+		print("JJUGUMEONG V0.2 tests: PASS")
 		get_tree().quit(0)
 	else:
-		push_error("JJUGUMEONG V0.1 tests: %d failure(s)" % _failures)
+		push_error("JJUGUMEONG V0.2 tests: %d failure(s)" % _failures)
 		get_tree().quit(1)
 
 
@@ -99,6 +101,16 @@ func _test_korean_font() -> void:
 		_expect_true(game_font.has_char(character.unicode_at(0)), "font glyph %s" % character)
 
 
+func _test_stage_backgrounds() -> void:
+	for path: String in [
+		"res://assets/background/stages/old_kitchen.jpg",
+		"res://assets/background/stages/food_storage.jpg",
+		"res://assets/background/stages/convenience_store.jpg"
+	]:
+		var background: Texture2D = load(path) as Texture2D
+		_expect_true(background != null, "stage background loads: %s" % path)
+
+
 func _test_save_round_trip() -> void:
 	var payload: Dictionary = {
 		"schema_version": SaveManager.CURRENT_SCHEMA_VERSION,
@@ -126,6 +138,32 @@ func _test_save_round_trip() -> void:
 		_expect_equal_float(loaded_cheese, 321.0, "save/load cheese")
 	else:
 		_fail("save/load cheese type")
+
+
+func _test_ui_layout() -> void:
+	GameManager.tutorial_step = 4
+	var host: Control = Control.new()
+	host.size = Vector2(768.0, 1024.0)
+	add_child(host)
+	var game_ui: GameUI = GameUI.new()
+	host.add_child(game_ui)
+	await get_tree().process_frame
+	_expect_true(game_ui.top_panel.position.x >= 0.0, "portrait top panel left bound")
+	_expect_true(
+		game_ui.top_panel.position.x + game_ui.top_panel.size.x <= host.size.x,
+		"portrait top panel right bound"
+	)
+	_expect_true(
+		game_ui.bottom_panel.position.y + game_ui.bottom_panel.size.y <= host.size.y,
+		"portrait bottom panel bound"
+	)
+	_expect_true(game_ui.button_grid.columns == 2, "portrait action columns")
+	_expect_true(
+		game_ui.next_reward_panel.position.x + game_ui.next_reward_panel.size.x <= host.size.x,
+		"portrait reward card right bound"
+	)
+	host.queue_free()
+	await get_tree().process_frame
 
 
 func _test_mouse_round_trip() -> void:

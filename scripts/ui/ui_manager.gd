@@ -11,6 +11,13 @@ var golden_label: Label
 var boost_label: Label
 var next_stage_label: Label
 var toast_label: Label
+var next_reward_panel: PanelContainer
+var next_reward_title: Label
+var next_reward_detail: Label
+var next_reward_progress: ProgressBar
+var discovery_panel: PanelContainer
+var discovery_title: Label
+var discovery_detail: Label
 
 var speed_button: Button
 var carry_button: Button
@@ -29,6 +36,7 @@ var offline_text: Label
 
 var _toast_remaining: float = 0.0
 var _refresh_elapsed: float = 0.0
+var _discovery_remaining: float = 0.0
 
 
 func _ready() -> void:
@@ -55,10 +63,15 @@ func _process(delta: float) -> void:
 		toast_label.modulate.a = minf(1.0, _toast_remaining * 2.0)
 		if _toast_remaining <= 0.0:
 			toast_label.hide()
+	if _discovery_remaining > 0.0:
+		_discovery_remaining = maxf(_discovery_remaining - delta, 0.0)
+		discovery_panel.modulate.a = minf(1.0, _discovery_remaining * 1.5)
+		if _discovery_remaining <= 0.0:
+			discovery_panel.hide()
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_RESIZED and is_node_ready():
+	if what == NOTIFICATION_RESIZED and is_node_ready() and top_panel != null:
 		_update_responsive_layout()
 
 
@@ -82,7 +95,7 @@ func _build_interface() -> void:
 	var title_row: HBoxContainer = HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 14)
 	top_vbox.add_child(title_row)
-	title_label = _make_label("쥐구멍  ALPHA 0.1.2", 25, Color("#ffd969"))
+	title_label = _make_label("쥐구멍  ALPHA 0.2", 25, Color("#ffd969"))
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title_label)
 	save_label = _make_label("불러오는 중...", 14, Color("#afc9bd"))
@@ -126,11 +139,14 @@ func _build_interface() -> void:
 	bottom_margin.add_theme_constant_override("margin_top", 12)
 	bottom_margin.add_theme_constant_override("margin_bottom", 12)
 	bottom_panel.add_child(bottom_margin)
+	var bottom_content: VBoxContainer = VBoxContainer.new()
+	bottom_content.add_theme_constant_override("separation", 8)
+	bottom_margin.add_child(bottom_content)
 	button_grid = GridContainer.new()
 	button_grid.columns = 4
 	button_grid.add_theme_constant_override("h_separation", 9)
 	button_grid.add_theme_constant_override("v_separation", 9)
-	bottom_margin.add_child(button_grid)
+	bottom_content.add_child(button_grid)
 
 	speed_button = _make_button("", _on_speed_pressed, Color("#5d486f"))
 	carry_button = _make_button("", _on_carry_pressed, Color("#5d486f"))
@@ -140,10 +156,11 @@ func _build_interface() -> void:
 	button_grid.add_child(carry_button)
 	button_grid.add_child(mouse_button)
 	button_grid.add_child(hole_button)
-	button_grid.add_child(_make_button("통계", _show_stats, Color("#394b63")))
-	button_grid.add_child(_make_button("수동 저장", _save_manually, Color("#3f625c")))
-	button_grid.add_child(_make_button("탐험 (예정)", _show_future_message.bind("탐험"), Color("#303640")))
-	button_grid.add_child(_make_button("건설·연구 (예정)", _show_future_message.bind("건설·연구"), Color("#303640")))
+	var utility_row: HBoxContainer = HBoxContainer.new()
+	utility_row.add_theme_constant_override("separation", 9)
+	bottom_content.add_child(utility_row)
+	utility_row.add_child(_make_utility_button("통계", _show_stats))
+	utility_row.add_child(_make_utility_button("지금 저장", _save_manually))
 
 	toast_label = _make_label("", 20, Color("#fff4d4"))
 	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -153,9 +170,64 @@ func _build_interface() -> void:
 	toast_label.hide()
 	add_child(toast_label)
 
+	_build_next_reward_panel()
+	_build_discovery_panel()
 	_build_stats_panel()
 	_build_tutorial_panel()
 	_build_offline_panel()
+
+
+func _build_next_reward_panel() -> void:
+	next_reward_panel = PanelContainer.new()
+	next_reward_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.055, 0.045, 0.07, 0.9), 14)
+	)
+	add_child(next_reward_panel)
+	var margin: MarginContainer = _make_margin(14)
+	next_reward_panel.add_child(margin)
+	var content: VBoxContainer = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 4)
+	margin.add_child(content)
+	next_reward_title = _make_label("", 18, Color("#ffe384"))
+	next_reward_title.clip_text = true
+	content.add_child(next_reward_title)
+	next_reward_detail = _make_label("", 14, Color("#eee7f0"))
+	next_reward_detail.clip_text = true
+	content.add_child(next_reward_detail)
+	next_reward_progress = ProgressBar.new()
+	next_reward_progress.show_percentage = false
+	next_reward_progress.custom_minimum_size = Vector2(0.0, 12.0)
+	next_reward_progress.add_theme_stylebox_override(
+		"background",
+		_make_panel_style(Color(0.13, 0.12, 0.16, 0.95), 6)
+	)
+	next_reward_progress.add_theme_stylebox_override(
+		"fill",
+		_make_panel_style(Color("#e4af43"), 6)
+	)
+	content.add_child(next_reward_progress)
+
+
+func _build_discovery_panel() -> void:
+	discovery_panel = PanelContainer.new()
+	discovery_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.055, 0.035, 0.07, 0.96), 18)
+	)
+	discovery_panel.hide()
+	add_child(discovery_panel)
+	var margin: MarginContainer = _make_margin(24)
+	discovery_panel.add_child(margin)
+	var content: VBoxContainer = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	margin.add_child(content)
+	discovery_title = _make_label("", 27, Color("#ffd969"))
+	discovery_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(discovery_title)
+	discovery_detail = _make_label("", 17, Color("#f3e9d5"))
+	discovery_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(discovery_detail)
 
 
 func _build_stats_panel() -> void:
@@ -251,15 +323,33 @@ func _refresh_all() -> void:
 	var next_stage: Dictionary = GameManager.get_next_stage()
 	if next_stage.is_empty():
 		next_stage_label.text = "초기 지역 전체 개방"
+		next_reward_title.text = "초기 지역 전체 개방"
+		next_reward_detail.text = "다음: 쥐구멍 확장"
+		next_reward_progress.value = 100.0
 	else:
+		var current_threshold: float = _dictionary_float(stage, "unlock_total_cheese", 0.0)
+		var target_threshold: float = _dictionary_float(next_stage, "unlock_total_cheese", 0.0)
 		var needed: float = maxf(
 			0.0,
-			_dictionary_float(next_stage, "unlock_total_cheese", 0.0) - GameManager.total_cheese
+			target_threshold - GameManager.total_cheese
 		)
 		next_stage_label.text = "다음: %s (누적 %s 남음)" % [
 			_dictionary_string(next_stage, "name", ""),
 			_format_number(needed)
 		]
+		next_reward_title.text = "다음 보상  ·  %s" % _dictionary_string(next_stage, "name", "")
+		next_reward_detail.text = "%s / %s  ·  %s" % [
+			_format_number(GameManager.total_cheese),
+			_format_number(target_threshold),
+			_get_stage_preview(GameManager.current_stage_index + 1)
+		]
+		next_reward_progress.value = clampf(
+			(GameManager.total_cheese - current_threshold)
+			/ maxf(1.0, target_threshold - current_threshold)
+			* 100.0,
+			0.0,
+			100.0
+		)
 	_on_golden_changed(GameManager.golden_remaining > 0.0, GameManager.golden_remaining)
 	_on_boost_changed(GameManager.click_boost_remaining > 0.0, GameManager.click_boost_remaining)
 
@@ -276,9 +366,16 @@ func _update_responsive_layout() -> void:
 	bottom_panel.set_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom_panel.offset_left = side_margin
 	bottom_panel.offset_right = -side_margin
-	bottom_panel.offset_top = -186.0 if not compact_layout else -328.0
+	bottom_panel.offset_top = -158.0 if not compact_layout else -228.0
 	bottom_panel.offset_bottom = -18.0
 	button_grid.columns = 4 if not compact_layout else 2
+	next_reward_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	var reward_width: float = minf(380.0, viewport_size.x - side_margin * 2.0)
+	next_reward_panel.position = Vector2(
+		-reward_width - side_margin,
+		top_panel.offset_bottom + 12.0
+	)
+	next_reward_panel.size = Vector2(reward_width, 98.0)
 
 	toast_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	var toast_width: float = minf(420.0, viewport_size.x - side_margin * 2.0)
@@ -287,6 +384,7 @@ func _update_responsive_layout() -> void:
 	_place_modal(stats_panel, Vector2(430.0, 380.0))
 	_place_modal(tutorial_panel, Vector2(480.0, 280.0))
 	_place_modal(offline_panel, Vector2(480.0, 260.0))
+	_place_modal(discovery_panel, Vector2(520.0, 150.0))
 
 
 func _place_modal(panel: Control, desired_size: Vector2) -> void:
@@ -325,6 +423,13 @@ func _make_button(text_value: String, callback: Callable, color: Color) -> Butto
 	button.add_theme_stylebox_override("pressed", _make_panel_style(color.darkened(0.12), 9))
 	button.add_theme_stylebox_override("disabled", _make_panel_style(Color("#29272e"), 9))
 	button.pressed.connect(callback)
+	return button
+
+
+func _make_utility_button(text_value: String, callback: Callable) -> Button:
+	var button: Button = _make_button(text_value, callback, Color(0.14, 0.16, 0.2, 0.92))
+	button.custom_minimum_size = Vector2(120.0, 36.0)
+	button.add_theme_font_size_override("font_size", 14)
 	return button
 
 
@@ -452,6 +557,13 @@ func _show_toast(message: String) -> void:
 
 func _on_stage_changed(_stage_index: int) -> void:
 	_refresh_all()
+	var stage: Dictionary = GameManager.get_current_stage()
+	discovery_title.text = "새 지역 발견  ·  %s" % _dictionary_string(stage, "name", "")
+	discovery_detail.text = _get_stage_preview(GameManager.current_stage_index)
+	discovery_panel.modulate.a = 1.0
+	discovery_panel.show()
+	discovery_panel.move_to_front()
+	_discovery_remaining = 3.0
 
 
 func _on_golden_changed(active: bool, remaining: float) -> void:
@@ -475,6 +587,20 @@ func _on_save_status_changed(message: String) -> void:
 func _on_tutorial_changed(_step: int) -> void:
 	if tutorial_panel.visible:
 		tutorial_text.text = GameManager.get_tutorial_text()
+
+
+func _get_stage_preview(stage_index: int) -> String:
+	match stage_index:
+		1:
+			return "저장 공간 · 식료품 창고"
+		2:
+			return "야간 탐험 · 동네 편의점"
+		3:
+			return "전문 운반 · 대형 식당"
+		4:
+			return "기계 시대 · 치즈 공장"
+		_:
+			return "첫 동료 · 쥐구멍 강화"
 
 
 func _dictionary_float(data: Dictionary, key: String, fallback: float) -> float:

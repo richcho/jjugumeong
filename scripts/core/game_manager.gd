@@ -289,6 +289,7 @@ func _update_unlocked_stage() -> void:
 		EventBus.toast_requested.emit(
 			"새 지역 개방: %s" % _dictionary_string(get_current_stage(), "name", "")
 		)
+		save_now()
 
 
 func _calculate_offline_reward() -> void:
