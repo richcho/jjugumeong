@@ -32,6 +32,10 @@
 | 역할 보드 해금 | 쥐 3마리 | `ROLE_BOARD_UNLOCK_MOUSE_COUNT` |
 | 탐험쥐 보너스 | 1마리당 지역 활동 보상 +10%, 최대 +30% | `ROLE_BONUS_*` |
 | 건설쥐 보너스 | 1마리당 새 새끼 성장 -10%, 최대 -30% | `ROLE_BONUS_*` |
+| 첫 영웅 해금 | 쥐 5마리 | `HERO_UNLOCK_MOUSE_COUNT` |
+| 단단이 | 일반 채집과 예상 생산 +10% | `HERO_GATHER_MULTIPLIER` |
+| 새벽 | 지역 사건·현장 행동 보상 +15% | `HERO_REGION_MULTIPLIER` |
+| 보름 | 돌봄 1회 시간 단축 20초 | `HERO_CARE_REDUCTION_SECONDS` |
 
 강화 비용 공식:
 

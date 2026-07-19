@@ -27,6 +27,9 @@ func _run_tests() -> void:
 	_test_nursery_view_input()
 	_test_role_assignment()
 	_test_role_board_input()
+	_test_hero_data()
+	_test_hero_selection()
+	_test_hero_choice_input()
 	_test_reward_text_bounds()
 	_test_stage_backgrounds()
 	_test_stage_choice_events()
@@ -39,10 +42,10 @@ func _run_tests() -> void:
 	await _test_mouse_round_trip()
 
 	if _failures == 0:
-		print("JJUGUMEONG V0.4.1 tests: PASS")
+		print("JJUGUMEONG V0.4.2 tests: PASS")
 		get_tree().quit(0)
 	else:
-		push_error("JJUGUMEONG V0.4.1 tests: %d failure(s)" % _failures)
+		push_error("JJUGUMEONG V0.4.2 tests: %d failure(s)" % _failures)
 		get_tree().quit(1)
 
 
@@ -55,9 +58,9 @@ func _test_time_cap() -> void:
 func _test_build_info() -> void:
 	_expect_true(GameManager.display_name == "쥐구멍", "build display name")
 	_expect_true(GameManager.product_name == "r4", "build product name")
-	_expect_true(GameManager.build_version == "0.4.1", "build version")
+	_expect_true(GameManager.build_version == "0.4.2", "build version")
 	_expect_true(GameManager.build_phase == "V0.4 Alpha", "build phase")
-	_expect_true(GameManager.get_build_label() == "r4 0.4.1", "build label")
+	_expect_true(GameManager.get_build_label() == "r4 0.4.2", "build label")
 
 
 func _test_save_schema_migration() -> void:
@@ -86,7 +89,8 @@ func _test_save_schema_migration() -> void:
 			"gatherer": 1,
 			"explorer": 0,
 			"builder": 0
-		}
+		},
+		"selected_hero_id": ""
 	}
 	var migrated_value: Variant = SaveManager.call("_migrate_data", legacy, defaults)
 	_expect_true(migrated_value is Dictionary, "schema 1 migration result type")
@@ -95,7 +99,7 @@ func _test_save_schema_migration() -> void:
 		var migrated: Dictionary = migrated_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(migrated, "schema_version", 0),
-			6,
+			7,
 			"schema migration version"
 		)
 		_expect_equal_int(
@@ -130,7 +134,7 @@ func _test_save_schema_migration() -> void:
 		var schema_two_migrated: Dictionary = schema_two_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(schema_two_migrated, "schema_version", 0),
-			6,
+			7,
 			"schema 2 migration version"
 		)
 		_expect_equal_int(
@@ -163,7 +167,7 @@ func _test_save_schema_migration() -> void:
 		var schema_four_migrated: Dictionary = schema_four_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(schema_four_migrated, "schema_version", 0),
-			6,
+			7,
 			"schema 4 migration version"
 		)
 		_expect_equal_int(
@@ -199,6 +203,28 @@ func _test_save_schema_migration() -> void:
 			_dictionary_int(roles, "gatherer", 0),
 			4,
 			"schema 5 mice migrate to gatherers"
+		)
+	var schema_six: Dictionary = {
+		"schema_version": 6,
+		"mouse_count": 5,
+		"role_assignments": {
+			"gatherer": 3,
+			"explorer": 1,
+			"builder": 1
+		}
+	}
+	var schema_six_value: Variant = SaveManager.call(
+		"_migrate_data",
+		schema_six,
+		defaults
+	)
+	_expect_true(schema_six_value is Dictionary, "schema 6 migration result type")
+	if schema_six_value is Dictionary:
+		@warning_ignore("unsafe_cast")
+		var schema_six_migrated: Dictionary = schema_six_value as Dictionary
+		_expect_true(
+			_dictionary_string(schema_six_migrated, "selected_hero_id", "").is_empty(),
+			"schema 6 hero initialized"
 		)
 
 
@@ -301,9 +327,9 @@ func _test_role_assignment() -> void:
 	var previous_stage_index: int = GameManager.current_stage_index
 	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
 	var previous_golden: float = GameManager.golden_remaining
-	var previous_cheese: float = GameManager.cheese
 	var previous_nursery_level: int = GameManager.nursery_level
 	var previous_pups: Array[Dictionary] = GameManager.nursery_pups.duplicate(true)
+	var previous_cheese: float = GameManager.cheese
 	var previous_next_pup_id: int = GameManager.next_pup_id
 	GameManager.mouse_count = 2
 	GameManager.role_assignments = {
@@ -392,6 +418,145 @@ func _test_role_board_input() -> void:
 		"role board builder point input"
 	)
 	role_board.free()
+
+
+func _test_hero_data() -> void:
+	var candidates: Array[Dictionary] = GameManager.get_hero_candidates()
+	_expect_equal_int(candidates.size(), 3, "hero candidate count")
+	var ids: Array[String] = []
+	for candidate: Dictionary in candidates:
+		var hero_id: String = _dictionary_string(candidate, "id", "")
+		_expect_true(not hero_id.is_empty(), "hero candidate id")
+		_expect_true(not ids.has(hero_id), "hero candidate id unique")
+		ids.append(hero_id)
+		_expect_true(
+			not _dictionary_string(candidate, "name", "").is_empty(),
+			"hero candidate name"
+		)
+		_expect_true(
+			not _dictionary_string(candidate, "effect", "").is_empty(),
+			"hero candidate effect"
+		)
+
+
+func _test_hero_selection() -> void:
+	var previous_mouse_count: int = GameManager.mouse_count
+	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
+	var previous_hero_id: String = GameManager.selected_hero_id
+	var previous_stage_index: int = GameManager.current_stage_index
+	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
+	var previous_golden: float = GameManager.golden_remaining
+	var previous_nursery_level: int = GameManager.nursery_level
+	var previous_pups: Array[Dictionary] = GameManager.nursery_pups.duplicate(true)
+	GameManager.mouse_count = 4
+	GameManager.role_assignments = {
+		"gatherer": 4,
+		"explorer": 0,
+		"builder": 0
+	}
+	GameManager.selected_hero_id = ""
+	_expect_true(not GameManager.recruit_hero("dandani"), "hero selection locked")
+	GameManager.mouse_count = 5
+	GameManager.role_assignments = {
+		"gatherer": 5,
+		"explorer": 0,
+		"builder": 0
+	}
+	_expect_true(not GameManager.recruit_hero("unknown"), "unknown hero rejected")
+	var mouse_count_before: int = GameManager.mouse_count
+	var roles_before: Dictionary = GameManager.role_assignments.duplicate(true)
+	_expect_true(GameManager.recruit_hero("dandani"), "first hero recruited")
+	_expect_true(not GameManager.recruit_hero("saebyeok"), "second hero rejected")
+	_expect_equal_int(GameManager.mouse_count, mouse_count_before, "hero keeps mouse count")
+	_expect_true(GameManager.role_assignments == roles_before, "hero keeps role assignments")
+	GameManager.current_stage_index = 0
+	GameManager.region_progress = {}
+	GameManager.golden_remaining = 0.0
+	_expect_equal_float(
+		GameManager.get_gather_hero_multiplier(),
+		1.1,
+		"carrier hero multiplier"
+	)
+	var carrier_reward_value: Variant = GameManager.call(
+		"_calculate_trip_reward",
+		10,
+		1.0,
+		true
+	)
+	_expect_true(carrier_reward_value is int, "carrier reward type")
+	if carrier_reward_value is int:
+		@warning_ignore("unsafe_cast")
+		var carrier_reward: int = carrier_reward_value as int
+		_expect_equal_int(carrier_reward, 275, "carrier hero ordinary reward")
+	var special_reward_value: Variant = GameManager.call(
+		"_calculate_trip_reward",
+		10,
+		1.0,
+		false
+	)
+	_expect_true(special_reward_value is int, "special reward type")
+	if special_reward_value is int:
+		@warning_ignore("unsafe_cast")
+		var special_reward: int = special_reward_value as int
+		_expect_equal_int(special_reward, 250, "carrier excluded from special reward")
+	GameManager.selected_hero_id = "saebyeok"
+	GameManager.role_assignments = {
+		"gatherer": 4,
+		"explorer": 1,
+		"builder": 0
+	}
+	_expect_equal_float(
+		GameManager.get_region_activity_multiplier(),
+		1.265,
+		"scout hero and explorer multiply"
+	)
+	GameManager.selected_hero_id = "boreum"
+	_expect_equal_int(
+		GameManager.get_nursery_care_reduction_seconds(),
+		20,
+		"caregiver hero care reduction"
+	)
+	GameManager.nursery_level = 1
+	GameManager.nursery_pups = [{
+		"id": 99,
+		"ready_unix": TimeManager.current_unix_time() + 100,
+		"care_count": 0
+	}]
+	var care_ready_before: int = _dictionary_int(
+		GameManager.nursery_pups[0],
+		"ready_unix",
+		0
+	)
+	_expect_true(GameManager.care_for_pup(99), "caregiver hero applies care")
+	_expect_equal_int(
+		_dictionary_int(GameManager.nursery_pups[0], "ready_unix", 0),
+		care_ready_before - 20,
+		"caregiver hero actual time reduction"
+	)
+	GameManager.mouse_count = previous_mouse_count
+	GameManager.role_assignments = previous_roles
+	GameManager.selected_hero_id = previous_hero_id
+	GameManager.current_stage_index = previous_stage_index
+	GameManager.region_progress = previous_region_progress
+	GameManager.golden_remaining = previous_golden
+	GameManager.nursery_level = previous_nursery_level
+	GameManager.nursery_pups = previous_pups
+
+
+func _test_hero_choice_input() -> void:
+	var hero_view: HeroChoiceView = HeroChoiceView.new()
+	hero_view.size = Vector2(500.0, 290.0)
+	hero_view.setup(GameManager.get_hero_candidates())
+	_expect_true(
+		hero_view.submit_point(Vector2(-100.0, -100.0)).is_empty(),
+		"hero view ignores distant input"
+	)
+	_expect_true(
+		hero_view.submit_point(hero_view.get_candidate_position(1)) == "saebyeok",
+		"hero candidate point input"
+	)
+	_expect_true(hero_view.preview_hero_id == "saebyeok", "hero preview state")
+	hero_view.free()
 
 
 func _test_upgrade_costs() -> void:
@@ -602,6 +767,7 @@ func _test_region_events() -> void:
 	var previous_boost: float = GameManager.click_boost_remaining
 	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
 	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
+	var previous_hero_id: String = GameManager.selected_hero_id
 
 	GameManager.current_stage_index = 0
 	GameManager.highest_unlocked_stage_index = 0
@@ -617,6 +783,7 @@ func _test_region_events() -> void:
 		"explorer": 0,
 		"builder": 0
 	}
+	GameManager.selected_hero_id = ""
 	GameManager.region_progress["old_kitchen"] = {
 		"action_level": 0,
 		"risk_level": 2,
@@ -675,17 +842,41 @@ func _test_region_events() -> void:
 		0,
 		"repeat region event has no discovery bonus"
 	)
+	GameManager.current_stage_index = 0
+	GameManager.highest_unlocked_stage_index = 0
+	GameManager.unlocked_stage_ids = ["old_kitchen"]
+	GameManager.cheese = 0.0
+	GameManager.total_cheese = 0.0
 	GameManager.next_region_event_unix = 0
 	GameManager.role_assignments = {
 		"gatherer": maxi(1, GameManager.mouse_count - 1),
 		"explorer": 1,
 		"builder": 0
 	}
+	GameManager.selected_hero_id = ""
 	var explorer_result: Dictionary = GameManager.resolve_region_event(0)
 	_expect_equal_int(
 		_dictionary_int(explorer_result, "reward", 0),
 		55,
 		"explorer increases region event reward"
+	)
+	GameManager.current_stage_index = 0
+	GameManager.highest_unlocked_stage_index = 0
+	GameManager.unlocked_stage_ids = ["old_kitchen"]
+	GameManager.cheese = 0.0
+	GameManager.total_cheese = 0.0
+	GameManager.next_region_event_unix = 0
+	GameManager.role_assignments = {
+		"gatherer": GameManager.mouse_count,
+		"explorer": 0,
+		"builder": 0
+	}
+	GameManager.selected_hero_id = "saebyeok"
+	var scout_result: Dictionary = GameManager.resolve_region_event(0)
+	_expect_equal_int(
+		_dictionary_int(scout_result, "reward", 0),
+		57,
+		"scout hero increases region event reward"
 	)
 	GameManager.current_stage_index = 0
 	GameManager.highest_unlocked_stage_index = 0
@@ -730,6 +921,7 @@ func _test_region_events() -> void:
 	GameManager.click_boost_remaining = previous_boost
 	GameManager.region_progress = previous_region_progress
 	GameManager.role_assignments = previous_roles
+	GameManager.selected_hero_id = previous_hero_id
 
 
 func _test_field_action_data() -> void:
@@ -776,6 +968,7 @@ func _test_field_action_resolution() -> void:
 	var previous_cooldown: int = GameManager.next_field_action_unix
 	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
 	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
+	var previous_hero_id: String = GameManager.selected_hero_id
 
 	GameManager.current_stage_index = 0
 	GameManager.highest_unlocked_stage_index = 0
@@ -791,6 +984,7 @@ func _test_field_action_resolution() -> void:
 		"explorer": 0,
 		"builder": 0
 	}
+	GameManager.selected_hero_id = ""
 	GameManager.region_progress["old_kitchen"] = {
 		"action_level": 0,
 		"risk_level": 2,
@@ -878,6 +1072,7 @@ func _test_field_action_resolution() -> void:
 	GameManager.next_field_action_unix = previous_cooldown
 	GameManager.region_progress = previous_region_progress
 	GameManager.role_assignments = previous_roles
+	GameManager.selected_hero_id = previous_hero_id
 
 
 func _test_dot_action_input() -> void:
@@ -1113,6 +1308,7 @@ func _test_save_round_trip() -> void:
 			"explorer": 1,
 			"builder": 1
 		},
+		"selected_hero_id": "saebyeok",
 		"tutorial_step": 4,
 		"play_time_seconds": 99.0,
 		"total_trips": 12,
@@ -1143,6 +1339,10 @@ func _test_save_round_trip() -> void:
 		),
 		1,
 		"save/load role assignments"
+	)
+	_expect_true(
+		_dictionary_string(loaded, "selected_hero_id", "") == "saebyeok",
+		"save/load selected hero"
 	)
 
 
@@ -1282,6 +1482,23 @@ func _test_ui_layout() -> void:
 	game_ui.call("_hide_role_board")
 	GameManager.mouse_count = previous_mouse_count
 	GameManager.role_assignments = previous_roles
+	var previous_hero_id: String = GameManager.selected_hero_id
+	GameManager.mouse_count = 5
+	GameManager.selected_hero_id = ""
+	game_ui.call("_show_hero_panel")
+	await get_tree().process_frame
+	_expect_true(game_ui.hero_panel.visible, "portrait hero panel opens")
+	_expect_true(
+		game_ui.hero_panel.get_global_rect().end.y <= host.size.y,
+		"portrait hero panel bottom bound"
+	)
+	_expect_equal_int(game_ui.hero_view.candidates.size(), 3, "hero panel candidates")
+	_expect_true(game_ui.hero_confirm_button.disabled, "hero confirm waits for preview")
+	game_ui.call("_on_hero_candidate_pressed", "saebyeok")
+	_expect_true(not game_ui.hero_confirm_button.disabled, "hero preview enables confirm")
+	game_ui.call("_hide_hero_panel")
+	GameManager.mouse_count = previous_mouse_count
+	GameManager.selected_hero_id = previous_hero_id
 	GameManager.current_stage_index = previous_stage_index
 	GameManager.next_field_action_unix = previous_field_cooldown
 	GameManager.next_region_event_unix = previous_cooldown

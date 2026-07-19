@@ -59,7 +59,7 @@ GatheringMouse 귀환
 | 주 파일 | `user://savegame.json` |
 | 백업 | `user://savegame.backup.json` |
 | 임시 파일 | `user://savegame.tmp.json` |
-| 현재 스키마 | 6 |
+| 현재 스키마 | 7 |
 
 저장 순서:
 
@@ -109,6 +109,11 @@ Web에서는 `user://`의 IndexedDB 저장, `localStorage`, 소형 쿠키 백업
 이하 저장의 기존 쥐는 모두 채집 역할로 이관합니다. 로드 시 역할 합계를 전체
 인구와 다시 맞추고 최소 채집쥐 1마리를 보장합니다. `WorldView`는 전체 인구가
 아닌 `GameManager.get_gatherer_count()`로 실제 채집조를 구성합니다.
+
+스키마 7은 `selected_hero_id`를 추가합니다. 스키마 6 이하 저장은 선택 없음으로
+이관하고, 저장된 ID가 `data/mice/heroes.json`에 없으면 선택 없음으로
+복구합니다. 후보 데이터는 표현과 설명을 담당하고, 해금·확정·효과 계산은
+`GameManager`가 담당합니다.
 
 ## 5. 화면과 반응형 규칙
 

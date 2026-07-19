@@ -60,6 +60,13 @@ var role_summary: Label
 var role_view: RoleBoardView
 var role_reset_button: Button
 var role_button: Button
+var hero_panel: PanelContainer
+var hero_summary: Label
+var hero_view: HeroChoiceView
+var hero_confirm_button: Button
+var hero_button: Button
+
+var _preview_hero_id: String = ""
 
 var _toast_remaining: float = 0.0
 var _refresh_elapsed: float = 0.0
@@ -210,6 +217,8 @@ func _build_interface() -> void:
 	utility_row.add_child(nursery_button)
 	role_button = _make_utility_button("역할", _show_role_board)
 	utility_row.add_child(role_button)
+	hero_button = _make_utility_button("영웅", _show_hero_panel)
+	utility_row.add_child(hero_button)
 	utility_row.add_child(_make_utility_button("지금 저장", _save_manually))
 
 	toast_label = _make_label("", 20, Color("#fff4d4"))
@@ -230,6 +239,7 @@ func _build_interface() -> void:
 	_build_field_action_panel()
 	_build_nursery_panel()
 	_build_role_panel()
+	_build_hero_panel()
 	_build_tutorial_panel()
 	_build_offline_panel()
 
@@ -467,6 +477,41 @@ func _build_role_panel() -> void:
 	content.add_child(_make_button("역할 보드 닫기", _hide_role_board, Color("#5d486f")))
 
 
+func _build_hero_panel() -> void:
+	hero_panel = PanelContainer.new()
+	hero_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.045, 0.03, 0.065, 0.99), 16)
+	)
+	hero_panel.hide()
+	add_child(hero_panel)
+	var margin: MarginContainer = _make_margin(18)
+	hero_panel.add_child(margin)
+	var content: VBoxContainer = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	margin.add_child(content)
+	var heading: Label = _make_label("군락의 첫 영웅", 24, Color("#ffd969"))
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(heading)
+	hero_summary = _make_label("", 14, Color("#eee7f3"))
+	hero_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hero_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(hero_summary)
+	hero_view = HeroChoiceView.new()
+	hero_view.custom_minimum_size = Vector2(0.0, 290.0)
+	hero_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hero_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hero_view.candidate_pressed.connect(_on_hero_candidate_pressed)
+	content.add_child(hero_view)
+	hero_confirm_button = _make_button(
+		"후보 점을 먼저 선택하세요",
+		_on_hero_confirm_pressed,
+		Color("#705274")
+	)
+	content.add_child(hero_confirm_button)
+	content.add_child(_make_button("영웅 기록 닫기", _hide_hero_panel, Color("#5d486f")))
+
+
 func _build_tutorial_panel() -> void:
 	tutorial_panel = PanelContainer.new()
 	tutorial_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.07, 0.055, 0.09, 0.98), 16))
@@ -592,6 +637,18 @@ func _refresh_all() -> void:
 	)
 	if role_panel.visible:
 		_refresh_role_panel()
+	var selected_hero: Dictionary = GameManager.get_selected_hero()
+	hero_button.text = (
+		"영웅 · %s" % _dictionary_string(selected_hero, "name", "")
+		if not selected_hero.is_empty()
+		else (
+			"영웅 · 선택 가능"
+			if GameManager.is_hero_selection_unlocked()
+			else "영웅 · 쥐 %d" % GameManager.HERO_UNLOCK_MOUSE_COUNT
+		)
+	)
+	if hero_panel.visible:
+		_refresh_hero_panel()
 
 	var reward: Dictionary = GameManager.get_next_reward_summary()
 	var reward_current: float = _dictionary_float(reward, "current", 0.0)
@@ -656,6 +713,7 @@ func _update_responsive_layout() -> void:
 	_place_modal(field_action_panel, Vector2(620.0, 620.0))
 	_place_modal(nursery_panel, Vector2(600.0, 620.0))
 	_place_modal(role_panel, Vector2(600.0, 540.0))
+	_place_modal(hero_panel, Vector2(600.0, 620.0))
 	_place_modal(tutorial_panel, Vector2(480.0, 280.0))
 	_place_modal(offline_panel, Vector2(480.0, 260.0))
 	_place_modal(discovery_panel, Vector2(520.0, 150.0))
@@ -702,7 +760,7 @@ func _make_button(text_value: String, callback: Callable, color: Color) -> Butto
 
 func _make_utility_button(text_value: String, callback: Callable) -> Button:
 	var button: Button = _make_button(text_value, callback, Color(0.14, 0.16, 0.2, 0.92))
-	button.custom_minimum_size = Vector2(90.0, 28.0)
+	button.custom_minimum_size = Vector2(78.0, 28.0)
 	button.add_theme_font_size_override("font_size", 12)
 	return button
 
@@ -770,6 +828,7 @@ func _show_stats() -> void:
 		+ "완료한 현장 행동: %d개\n"
 		+ "보육실 출신 성체: %d마리\n"
 		+ "역할 배치: 채집 %d · 탐험 %d · 건설 %d\n"
+		+ "첫 영웅: %s\n"
 		+ "현재 생산 보너스: %.2f배"
 	) % [
 		_format_number(GameManager.total_cheese),
@@ -783,6 +842,7 @@ func _show_stats() -> void:
 		GameManager.get_role_count("gatherer"),
 		GameManager.get_role_count("explorer"),
 		GameManager.get_role_count("builder"),
+		_dictionary_string(GameManager.get_selected_hero(), "name", "미선택"),
 		GameManager.get_stage_bonus()
 	]
 	stats_panel.show()
@@ -990,10 +1050,11 @@ func _refresh_nursery_panel() -> void:
 	if lines.is_empty():
 		lines.append("빈 보호 원이 새끼 점을 기다립니다.")
 	nursery_summary.text = (
-		"슬롯 %d/%d · 점을 누르면 성장 15초 단축\n%s"
+		"슬롯 %d/%d · 점을 누르면 성장 %d초 단축\n%s"
 	) % [
 		snapshots.size(),
 		GameManager.get_nursery_capacity(),
+		GameManager.get_nursery_care_reduction_seconds(),
 		"\n".join(lines)
 	]
 	nursery_primary_button.text = "새끼 보육 시작 · 치즈 %s" % _format_number(
@@ -1090,6 +1151,89 @@ func _on_role_pressed(role_id: String) -> void:
 func _on_role_reset_pressed() -> void:
 	GameManager.reset_mouse_roles()
 	_refresh_role_panel()
+
+
+func _show_hero_panel() -> void:
+	_preview_hero_id = GameManager.selected_hero_id
+	_refresh_hero_panel()
+	hero_panel.show()
+	hero_panel.move_to_front()
+
+
+func _hide_hero_panel() -> void:
+	hero_panel.hide()
+
+
+func _refresh_hero_panel() -> void:
+	var candidates: Array[Dictionary] = GameManager.get_hero_candidates()
+	var selected: Dictionary = GameManager.get_selected_hero()
+	hero_view.setup(candidates, _preview_hero_id)
+	if not selected.is_empty():
+		hero_summary.text = "%s · %s\n%s\n효과: %s" % [
+			_dictionary_string(selected, "name", "첫 영웅"),
+			_dictionary_string(selected, "title", ""),
+			_dictionary_string(selected, "story", ""),
+			_dictionary_string(selected, "effect", "")
+		]
+		hero_confirm_button.text = "첫 영웅 선택 완료"
+		hero_confirm_button.disabled = true
+		hero_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return
+	if not GameManager.is_hero_selection_unlocked():
+		hero_summary.text = (
+			"쥐 %d마리에서 첫 영웅 선택 · 현재 %d마리\n"
+			+ "후보는 군락의 기존 쥐이며 선택해도 전체 인구는 변하지 않습니다."
+		) % [
+			GameManager.HERO_UNLOCK_MOUSE_COUNT,
+			GameManager.mouse_count
+		]
+		hero_confirm_button.text = "아직 영웅 선택 잠김"
+		hero_confirm_button.disabled = true
+		hero_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return
+	hero_view.mouse_filter = Control.MOUSE_FILTER_STOP
+	var preview: Dictionary = _find_hero_candidate(candidates, _preview_hero_id)
+	if preview.is_empty():
+		hero_summary.text = (
+			"세 후보 점 중 하나를 눌러 이름, 이야기와 영구 효과를 확인하세요.\n"
+			+ "확정한 첫 영웅은 V0.4.2에서 교체할 수 없습니다."
+		)
+		hero_confirm_button.text = "후보 점을 먼저 선택하세요"
+		hero_confirm_button.disabled = true
+		return
+	hero_summary.text = "%s · %s\n%s\n효과: %s" % [
+		_dictionary_string(preview, "name", "후보"),
+		_dictionary_string(preview, "title", ""),
+		_dictionary_string(preview, "story", ""),
+		_dictionary_string(preview, "effect", "")
+	]
+	hero_confirm_button.text = "%s을(를) 첫 영웅으로 선택" % _dictionary_string(
+		preview,
+		"name",
+		"이 후보"
+	)
+	hero_confirm_button.disabled = false
+
+
+func _on_hero_candidate_pressed(hero_id: String) -> void:
+	if not GameManager.selected_hero_id.is_empty():
+		return
+	_preview_hero_id = hero_id
+	_refresh_hero_panel()
+
+
+func _on_hero_confirm_pressed() -> void:
+	if _preview_hero_id.is_empty():
+		return
+	GameManager.recruit_hero(_preview_hero_id)
+	_refresh_hero_panel()
+
+
+func _find_hero_candidate(candidates: Array[Dictionary], hero_id: String) -> Dictionary:
+	for candidate: Dictionary in candidates:
+		if _dictionary_string(candidate, "id", "") == hero_id:
+			return candidate
+	return {}
 
 
 func _on_field_action_status_changed(status_text: String) -> void:

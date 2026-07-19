@@ -2,6 +2,7 @@ extends Node
 
 const STAGES_PATH: String = "res://data/stages/stages.json"
 const BUILD_INFO_PATH: String = "res://data/build.json"
+const HEROES_PATH: String = "res://data/mice/heroes.json"
 const AUTO_SAVE_INTERVAL: float = 3.0
 const BASE_SPEED: float = 115.0
 const SPEED_LEVEL_CURVE: float = 32.0
@@ -28,6 +29,10 @@ const NURSERY_LEVEL_ONE_CAPACITY: int = 2
 const ROLE_BOARD_UNLOCK_MOUSE_COUNT: int = 3
 const ROLE_BONUS_PER_MOUSE: float = 0.1
 const ROLE_BONUS_MAX_MICE: int = 3
+const HERO_UNLOCK_MOUSE_COUNT: int = 5
+const HERO_GATHER_MULTIPLIER: float = 1.1
+const HERO_REGION_MULTIPLIER: float = 1.15
+const HERO_CARE_REDUCTION_SECONDS: int = 20
 
 var cheese: float = 0.0
 var total_cheese: float = 0.0
@@ -52,6 +57,7 @@ var role_assignments: Dictionary = {
 	"explorer": 0,
 	"builder": 0
 }
+var selected_hero_id: String = ""
 var tutorial_step: int = 0
 var golden_remaining: float = 0.0
 var click_boost_remaining: float = 0.0
@@ -60,6 +66,7 @@ var total_trips: int = 0
 var total_click_boosts: int = 0
 var total_golden_events: int = 0
 var stages: Array[Dictionary] = []
+var heroes: Array[Dictionary] = []
 var offline_reward: float = 0.0
 var offline_seconds: int = 0
 var display_name: String = "쥐구멍"
@@ -75,6 +82,7 @@ var _is_ready: bool = false
 func _ready() -> void:
 	_load_build_info()
 	_load_stages()
+	_load_heroes()
 	var loaded_data: Dictionary = SaveManager.load_game(_default_save_data())
 	_apply_save_data(loaded_data)
 	_reconcile_role_assignments()
@@ -123,8 +131,16 @@ func _notification(what: int) -> void:
 		save_now()
 
 
-func collect_trip(base_amount: int, reward_multiplier: float = 1.0) -> int:
-	var final_reward: int = _calculate_trip_reward(base_amount, reward_multiplier)
+func collect_trip(
+	base_amount: int,
+	reward_multiplier: float = 1.0,
+	include_gather_hero: bool = true
+) -> int:
+	var final_reward: int = _calculate_trip_reward(
+		base_amount,
+		reward_multiplier,
+		include_gather_hero
+	)
 	cheese += float(final_reward)
 	total_cheese += float(final_reward)
 	total_trips += 1
@@ -261,12 +277,12 @@ func care_for_pup(pup_id: int) -> bool:
 			return false
 		pup["ready_unix"] = maxi(
 			now,
-			_dictionary_int(pup, "ready_unix", now) - NURSERY_CARE_REDUCTION_SECONDS
+			_dictionary_int(pup, "ready_unix", now) - get_nursery_care_reduction_seconds()
 		)
 		pup["care_count"] = care_count + 1
 		nursery_pups[index] = pup
 		EventBus.toast_requested.emit(
-			"돌봄 완료 · 성장 %d초 단축" % NURSERY_CARE_REDUCTION_SECONDS
+			"돌봄 완료 · 성장 %d초 단축" % get_nursery_care_reduction_seconds()
 		)
 		EventBus.game_state_changed.emit()
 		save_now()
@@ -312,6 +328,27 @@ func get_gatherer_count() -> int:
 func get_explorer_reward_multiplier() -> float:
 	var bonus_mice: int = mini(get_role_count("explorer"), ROLE_BONUS_MAX_MICE)
 	return 1.0 + float(bonus_mice) * ROLE_BONUS_PER_MOUSE
+
+
+func get_region_activity_multiplier() -> float:
+	var hero_multiplier: float = (
+		HERO_REGION_MULTIPLIER
+		if selected_hero_id == "saebyeok"
+		else 1.0
+	)
+	return get_explorer_reward_multiplier() * hero_multiplier
+
+
+func get_gather_hero_multiplier() -> float:
+	return HERO_GATHER_MULTIPLIER if selected_hero_id == "dandani" else 1.0
+
+
+func get_nursery_care_reduction_seconds() -> int:
+	return (
+		HERO_CARE_REDUCTION_SECONDS
+		if selected_hero_id == "boreum"
+		else NURSERY_CARE_REDUCTION_SECONDS
+	)
 
 
 func get_builder_growth_multiplier() -> float:
@@ -388,6 +425,50 @@ func _reconcile_role_assignments() -> void:
 		"explorer": explorer_count,
 		"builder": builder_count
 	}
+
+
+func is_hero_selection_unlocked() -> bool:
+	return mouse_count >= HERO_UNLOCK_MOUSE_COUNT
+
+
+func get_hero_candidates() -> Array[Dictionary]:
+	return heroes.duplicate(true)
+
+
+func get_selected_hero() -> Dictionary:
+	for hero: Dictionary in heroes:
+		if _dictionary_string(hero, "id", "") == selected_hero_id:
+			return hero.duplicate(true)
+	return {}
+
+
+func recruit_hero(hero_id: String) -> bool:
+	if not is_hero_selection_unlocked():
+		EventBus.toast_requested.emit(
+			"첫 영웅은 쥐 %d마리부터 선택할 수 있습니다." % HERO_UNLOCK_MOUSE_COUNT
+		)
+		return false
+	if not selected_hero_id.is_empty():
+		EventBus.toast_requested.emit("첫 영웅은 이미 정해졌습니다.")
+		return false
+	var candidate_found: bool = false
+	for hero: Dictionary in heroes:
+		if _dictionary_string(hero, "id", "") == hero_id:
+			candidate_found = true
+			break
+	if not candidate_found:
+		return false
+	selected_hero_id = hero_id
+	var selected: Dictionary = get_selected_hero()
+	EventBus.toast_requested.emit(
+		"%s · %s이(가) 첫 영웅이 되었습니다!" % [
+			_dictionary_string(selected, "name", "이름 없는 쥐"),
+			_dictionary_string(selected, "title", "첫 영웅")
+		]
+	)
+	EventBus.game_state_changed.emit()
+	save_now()
+	return true
 
 
 func activate_click_boost() -> void:
@@ -640,14 +721,16 @@ func resolve_region_event(choice_index: int) -> Dictionary:
 			_dictionary_int(region_event, "first_discovery_reward_trips", 0)
 		)
 		completed_region_event_ids.append(event_id)
-	var role_multiplier: float = get_explorer_reward_multiplier()
+	var role_multiplier: float = get_region_activity_multiplier()
 	var base_reward: int = _calculate_trip_reward(
 		get_carry_capacity() * reward_trips,
-		role_multiplier
+		role_multiplier,
+		false
 	)
 	var reward: int = collect_trip(
 		get_carry_capacity() * (reward_trips + first_reward_trips),
-		role_multiplier
+		role_multiplier,
+		false
 	)
 	var first_discovery_reward: int = maxi(0, reward - base_reward)
 	var choice_effect: String = _dictionary_string(choice, "effect", "secure")
@@ -735,14 +818,16 @@ func resolve_field_action(action_id: String, mistakes: int) -> Dictionary:
 	if not result_flag.is_empty() and not flags.has(result_flag):
 		flags.append(result_flag)
 	state["flags"] = flags
-	var role_multiplier: float = get_explorer_reward_multiplier()
+	var role_multiplier: float = get_region_activity_multiplier()
 	var base_reward: int = _calculate_trip_reward(
 		get_carry_capacity() * reward_trips,
-		role_multiplier
+		role_multiplier,
+		false
 	)
 	var reward: int = collect_trip(
 		get_carry_capacity() * (reward_trips + first_reward_trips),
-		role_multiplier
+		role_multiplier,
+		false
 	)
 	region_progress[stage_id] = state
 	next_field_action_unix = (
@@ -864,6 +949,7 @@ func get_expected_per_second() -> float:
 	)
 	if golden_remaining > 0.0:
 		reward_per_trip *= GOLDEN_MULTIPLIER
+	reward_per_trip *= get_gather_hero_multiplier()
 	return reward_per_trip * float(get_gatherer_count()) / maxf(round_trip_seconds, 0.1)
 
 
@@ -909,13 +995,19 @@ func _scaled_cost(base_cost: int, purchased_levels: int) -> int:
 	return roundi(float(base_cost) * pow(1.5, float(purchased_levels)))
 
 
-func _calculate_trip_reward(base_amount: int, reward_multiplier: float = 1.0) -> int:
+func _calculate_trip_reward(
+	base_amount: int,
+	reward_multiplier: float = 1.0,
+	include_gather_hero: bool = true
+) -> int:
 	var reward: float = (
 		float(base_amount)
 		* get_stage_bonus()
 		* ALPHA_TEST_REWARD_MULTIPLIER
 		* maxf(0.0, reward_multiplier)
 	)
+	if include_gather_hero:
+		reward *= get_gather_hero_multiplier()
 	if golden_remaining > 0.0:
 		reward *= GOLDEN_MULTIPLIER
 	return maxi(1, roundi(reward))
@@ -989,6 +1081,7 @@ func _default_save_data() -> Dictionary:
 			"explorer": 0,
 			"builder": 0
 		},
+		"selected_hero_id": "",
 		"tutorial_step": 0,
 		"play_time_seconds": 0.0,
 		"total_trips": 0,
@@ -1065,6 +1158,9 @@ func _apply_save_data(data: Dictionary) -> void:
 		data,
 		"role_assignments"
 	).duplicate(true)
+	selected_hero_id = _dictionary_string(data, "selected_hero_id", "")
+	if get_selected_hero().is_empty():
+		selected_hero_id = ""
 	tutorial_step = clampi(_dictionary_int(data, "tutorial_step", 0), 0, 4)
 	play_time_seconds = maxf(0.0, _dictionary_float(data, "play_time_seconds", 0.0))
 	total_trips = maxi(0, _dictionary_int(data, "total_trips", 0))
@@ -1094,6 +1190,7 @@ func _build_save_data() -> Dictionary:
 		"total_raised_pups": total_raised_pups,
 		"next_pup_id": next_pup_id,
 		"role_assignments": role_assignments.duplicate(true),
+		"selected_hero_id": selected_hero_id,
 		"tutorial_step": tutorial_step,
 		"play_time_seconds": play_time_seconds,
 		"total_trips": total_trips,
@@ -1122,6 +1219,52 @@ func _load_stages() -> void:
 			stages.append(raw_stage as Dictionary)
 	if stages.is_empty():
 		_use_fallback_stage()
+
+
+func _load_heroes() -> void:
+	heroes.clear()
+	var hero_file: FileAccess = FileAccess.open(HEROES_PATH, FileAccess.READ)
+	if hero_file != null:
+		var parsed: Variant = JSON.parse_string(hero_file.get_as_text())
+		hero_file.close()
+		if parsed is Array:
+			@warning_ignore("unsafe_cast")
+			var raw_heroes: Array = parsed as Array
+			for raw_hero: Variant in raw_heroes:
+				if raw_hero is Dictionary:
+					@warning_ignore("unsafe_cast")
+					heroes.append((raw_hero as Dictionary).duplicate(true))
+	if heroes.is_empty():
+		heroes = _fallback_heroes()
+
+
+func _fallback_heroes() -> Array[Dictionary]:
+	return [
+		{
+			"id": "dandani",
+			"name": "단단이",
+			"title": "첫 운반대장",
+			"story": "가장 무거운 치즈를 끝까지 놓지 않고 돌아온 쥐.",
+			"effect": "일반 채집과 예상 생산 +10%",
+			"color": "#ffd969"
+		},
+		{
+			"id": "saebyeok",
+			"name": "새벽",
+			"title": "틈길 길잡이",
+			"story": "모두가 잠든 시간에 안전한 틈을 찾아낸 쥐.",
+			"effect": "지역 사건·현장 행동 보상 +15%",
+			"color": "#73d7ff"
+		},
+		{
+			"id": "boreum",
+			"name": "보름",
+			"title": "보육실 지킴이",
+			"story": "어린 점들의 작은 떨림을 먼저 알아차린 쥐.",
+			"effect": "돌봄 1회 성장 단축 15초 → 20초",
+			"color": "#df9cff"
+		}
+	]
 
 
 func _reconcile_unlocked_stages() -> void:
