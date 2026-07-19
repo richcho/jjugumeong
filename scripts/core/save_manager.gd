@@ -6,7 +6,7 @@ const TEMP_PATH: String = "user://savegame.tmp.json"
 const WEB_STORAGE_KEY: String = "jjugumeong.save.v1"
 const WEB_COOKIE_KEY: String = "jjugumeong_save"
 const WEB_COOKIE_MAX_SIZE: int = 2500
-const CURRENT_SCHEMA_VERSION: int = 7
+const CURRENT_SCHEMA_VERSION: int = 8
 
 var last_load_used_backup: bool = false
 var last_load_was_recovered: bool = false
@@ -227,6 +227,9 @@ func _migrate_data(data: Dictionary, default_data: Dictionary) -> Dictionary:
 		}
 	if schema_version < 7:
 		result["selected_hero_id"] = ""
+	if schema_version < 8:
+		result["hero_bond_level"] = 0
+		result["next_hero_mission_unix"] = 0
 	result["schema_version"] = CURRENT_SCHEMA_VERSION
 	return result
 

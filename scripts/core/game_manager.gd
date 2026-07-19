@@ -33,6 +33,9 @@ const HERO_UNLOCK_MOUSE_COUNT: int = 5
 const HERO_GATHER_MULTIPLIER: float = 1.1
 const HERO_REGION_MULTIPLIER: float = 1.15
 const HERO_CARE_REDUCTION_SECONDS: int = 20
+const HERO_MAX_BOND_LEVEL: int = 3
+const HERO_MISSION_COOLDOWN_SECONDS: int = 60
+const HERO_MISSION_REWARD_TRIPS: int = 3
 
 var cheese: float = 0.0
 var total_cheese: float = 0.0
@@ -58,6 +61,8 @@ var role_assignments: Dictionary = {
 	"builder": 0
 }
 var selected_hero_id: String = ""
+var hero_bond_level: int = 0
+var next_hero_mission_unix: int = 0
 var tutorial_step: int = 0
 var golden_remaining: float = 0.0
 var click_boost_remaining: float = 0.0
@@ -332,7 +337,7 @@ func get_explorer_reward_multiplier() -> float:
 
 func get_region_activity_multiplier() -> float:
 	var hero_multiplier: float = (
-		HERO_REGION_MULTIPLIER
+		HERO_REGION_MULTIPLIER + float(hero_bond_level) * 0.05
 		if selected_hero_id == "saebyeok"
 		else 1.0
 	)
@@ -340,15 +345,37 @@ func get_region_activity_multiplier() -> float:
 
 
 func get_gather_hero_multiplier() -> float:
-	return HERO_GATHER_MULTIPLIER if selected_hero_id == "dandani" else 1.0
+	return (
+		HERO_GATHER_MULTIPLIER + float(hero_bond_level) * 0.02
+		if selected_hero_id == "dandani"
+		else 1.0
+	)
 
 
 func get_nursery_care_reduction_seconds() -> int:
 	return (
-		HERO_CARE_REDUCTION_SECONDS
+		HERO_CARE_REDUCTION_SECONDS + hero_bond_level * 2
 		if selected_hero_id == "boreum"
 		else NURSERY_CARE_REDUCTION_SECONDS
 	)
+
+
+func get_selected_hero_effect_summary() -> String:
+	match selected_hero_id:
+		"dandani":
+			return "일반 채집과 예상 생산 +%d%%" % roundi(
+				(get_gather_hero_multiplier() - 1.0) * 100.0
+			)
+		"saebyeok":
+			var hero_only_multiplier: float = (
+				HERO_REGION_MULTIPLIER + float(hero_bond_level) * 0.05
+			)
+			return "지역 사건·현장 행동 보상 +%d%%" % roundi(
+				(hero_only_multiplier - 1.0) * 100.0
+			)
+		"boreum":
+			return "돌봄 1회 성장 단축 %d초" % get_nursery_care_reduction_seconds()
+	return ""
 
 
 func get_builder_growth_multiplier() -> float:
@@ -459,6 +486,8 @@ func recruit_hero(hero_id: String) -> bool:
 	if not candidate_found:
 		return false
 	selected_hero_id = hero_id
+	hero_bond_level = 0
+	next_hero_mission_unix = 0
 	var selected: Dictionary = get_selected_hero()
 	EventBus.toast_requested.emit(
 		"%s · %s이(가) 첫 영웅이 되었습니다!" % [
@@ -469,6 +498,41 @@ func recruit_hero(hero_id: String) -> bool:
 	EventBus.game_state_changed.emit()
 	save_now()
 	return true
+
+
+func get_hero_mission_cooldown() -> int:
+	return maxi(0, next_hero_mission_unix - TimeManager.current_unix_time())
+
+
+func resolve_hero_mission(hero_id: String, mistakes: int) -> Dictionary:
+	if selected_hero_id.is_empty() or hero_id != selected_hero_id:
+		return {}
+	if get_hero_mission_cooldown() > 0:
+		return {}
+	var hero: Dictionary = get_selected_hero()
+	if hero.is_empty():
+		return {}
+	var previous_bond_level: int = hero_bond_level
+	hero_bond_level = mini(HERO_MAX_BOND_LEVEL, hero_bond_level + 1)
+	var reward: int = collect_trip(
+		get_carry_capacity() * HERO_MISSION_REWARD_TRIPS,
+		1.0,
+		false
+	)
+	next_hero_mission_unix = (
+		TimeManager.current_unix_time() + HERO_MISSION_COOLDOWN_SECONDS
+	)
+	EventBus.game_state_changed.emit()
+	save_now()
+	return {
+		"hero_id": selected_hero_id,
+		"hero_name": _dictionary_string(hero, "name", "첫 영웅"),
+		"mission_title": _dictionary_string(hero, "mission_title", "영웅 임무"),
+		"reward": reward,
+		"mistakes": maxi(0, mistakes),
+		"bond_level": hero_bond_level,
+		"bond_increased": hero_bond_level > previous_bond_level
+	}
 
 
 func activate_click_boost() -> void:
@@ -1082,6 +1146,8 @@ func _default_save_data() -> Dictionary:
 			"builder": 0
 		},
 		"selected_hero_id": "",
+		"hero_bond_level": 0,
+		"next_hero_mission_unix": 0,
 		"tutorial_step": 0,
 		"play_time_seconds": 0.0,
 		"total_trips": 0,
@@ -1161,6 +1227,18 @@ func _apply_save_data(data: Dictionary) -> void:
 	selected_hero_id = _dictionary_string(data, "selected_hero_id", "")
 	if get_selected_hero().is_empty():
 		selected_hero_id = ""
+	hero_bond_level = clampi(
+		_dictionary_int(data, "hero_bond_level", 0),
+		0,
+		HERO_MAX_BOND_LEVEL
+	)
+	next_hero_mission_unix = maxi(
+		0,
+		_dictionary_int(data, "next_hero_mission_unix", 0)
+	)
+	if selected_hero_id.is_empty():
+		hero_bond_level = 0
+		next_hero_mission_unix = 0
 	tutorial_step = clampi(_dictionary_int(data, "tutorial_step", 0), 0, 4)
 	play_time_seconds = maxf(0.0, _dictionary_float(data, "play_time_seconds", 0.0))
 	total_trips = maxi(0, _dictionary_int(data, "total_trips", 0))
@@ -1191,6 +1269,8 @@ func _build_save_data() -> Dictionary:
 		"next_pup_id": next_pup_id,
 		"role_assignments": role_assignments.duplicate(true),
 		"selected_hero_id": selected_hero_id,
+		"hero_bond_level": hero_bond_level,
+		"next_hero_mission_unix": next_hero_mission_unix,
 		"tutorial_step": tutorial_step,
 		"play_time_seconds": play_time_seconds,
 		"total_trips": total_trips,
@@ -1246,7 +1326,10 @@ func _fallback_heroes() -> Array[Dictionary]:
 			"title": "첫 운반대장",
 			"story": "가장 무거운 치즈를 끝까지 놓지 않고 돌아온 쥐.",
 			"effect": "일반 채집과 예상 생산 +10%",
-			"color": "#ffd969"
+			"color": "#ffd969",
+			"mission_type": "balance",
+			"mission_title": "흔들리는 짐의 균형",
+			"mission_description": "좌우 짐점을 번갈아 눌러 치즈 더미의 중심을 잡습니다."
 		},
 		{
 			"id": "saebyeok",
@@ -1254,7 +1337,10 @@ func _fallback_heroes() -> Array[Dictionary]:
 			"title": "틈길 길잡이",
 			"story": "모두가 잠든 시간에 안전한 틈을 찾아낸 쥐.",
 			"effect": "지역 사건·현장 행동 보상 +15%",
-			"color": "#73d7ff"
+			"color": "#73d7ff",
+			"mission_type": "trail",
+			"mission_title": "어둠 속 틈길 기억",
+			"mission_description": "굽은 안전 경로의 빛을 처음부터 끝까지 따라갑니다."
 		},
 		{
 			"id": "boreum",
@@ -1262,7 +1348,10 @@ func _fallback_heroes() -> Array[Dictionary]:
 			"title": "보육실 지킴이",
 			"story": "어린 점들의 작은 떨림을 먼저 알아차린 쥐.",
 			"effect": "돌봄 1회 성장 단축 15초 → 20초",
-			"color": "#df9cff"
+			"color": "#df9cff",
+			"mission_type": "breath",
+			"mission_title": "어린 점의 숨결 맞추기",
+			"mission_description": "보호 원을 도는 숨결점을 순서대로 눌러 안정을 찾습니다."
 		}
 	]
 

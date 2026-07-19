@@ -30,6 +30,8 @@ func _run_tests() -> void:
 	_test_hero_data()
 	_test_hero_selection()
 	_test_hero_choice_input()
+	_test_hero_bond_missions()
+	_test_hero_bond_input()
 	_test_reward_text_bounds()
 	_test_stage_backgrounds()
 	_test_stage_choice_events()
@@ -42,10 +44,10 @@ func _run_tests() -> void:
 	await _test_mouse_round_trip()
 
 	if _failures == 0:
-		print("JJUGUMEONG V0.4.2 tests: PASS")
+		print("JJUGUMEONG V0.4.3 tests: PASS")
 		get_tree().quit(0)
 	else:
-		push_error("JJUGUMEONG V0.4.2 tests: %d failure(s)" % _failures)
+		push_error("JJUGUMEONG V0.4.3 tests: %d failure(s)" % _failures)
 		get_tree().quit(1)
 
 
@@ -58,9 +60,9 @@ func _test_time_cap() -> void:
 func _test_build_info() -> void:
 	_expect_true(GameManager.display_name == "쥐구멍", "build display name")
 	_expect_true(GameManager.product_name == "r4", "build product name")
-	_expect_true(GameManager.build_version == "0.4.2", "build version")
+	_expect_true(GameManager.build_version == "0.4.3", "build version")
 	_expect_true(GameManager.build_phase == "V0.4 Alpha", "build phase")
-	_expect_true(GameManager.get_build_label() == "r4 0.4.2", "build label")
+	_expect_true(GameManager.get_build_label() == "r4 0.4.3", "build label")
 
 
 func _test_save_schema_migration() -> void:
@@ -90,7 +92,9 @@ func _test_save_schema_migration() -> void:
 			"explorer": 0,
 			"builder": 0
 		},
-		"selected_hero_id": ""
+		"selected_hero_id": "",
+		"hero_bond_level": 0,
+		"next_hero_mission_unix": 0
 	}
 	var migrated_value: Variant = SaveManager.call("_migrate_data", legacy, defaults)
 	_expect_true(migrated_value is Dictionary, "schema 1 migration result type")
@@ -99,7 +103,7 @@ func _test_save_schema_migration() -> void:
 		var migrated: Dictionary = migrated_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(migrated, "schema_version", 0),
-			7,
+			8,
 			"schema migration version"
 		)
 		_expect_equal_int(
@@ -134,7 +138,7 @@ func _test_save_schema_migration() -> void:
 		var schema_two_migrated: Dictionary = schema_two_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(schema_two_migrated, "schema_version", 0),
-			7,
+			8,
 			"schema 2 migration version"
 		)
 		_expect_equal_int(
@@ -167,7 +171,7 @@ func _test_save_schema_migration() -> void:
 		var schema_four_migrated: Dictionary = schema_four_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(schema_four_migrated, "schema_version", 0),
-			7,
+			8,
 			"schema 4 migration version"
 		)
 		_expect_equal_int(
@@ -225,6 +229,40 @@ func _test_save_schema_migration() -> void:
 		_expect_true(
 			_dictionary_string(schema_six_migrated, "selected_hero_id", "").is_empty(),
 			"schema 6 hero initialized"
+		)
+	var schema_seven: Dictionary = {
+		"schema_version": 7,
+		"mouse_count": 5,
+		"selected_hero_id": "dandani"
+	}
+	var schema_seven_value: Variant = SaveManager.call(
+		"_migrate_data",
+		schema_seven,
+		defaults
+	)
+	_expect_true(schema_seven_value is Dictionary, "schema 7 migration result type")
+	if schema_seven_value is Dictionary:
+		@warning_ignore("unsafe_cast")
+		var schema_seven_migrated: Dictionary = schema_seven_value as Dictionary
+		_expect_equal_int(
+			_dictionary_int(schema_seven_migrated, "schema_version", 0),
+			8,
+			"schema 7 migration version"
+		)
+		_expect_true(
+			_dictionary_string(schema_seven_migrated, "selected_hero_id", "")
+			== "dandani",
+			"schema 7 selected hero preserved"
+		)
+		_expect_equal_int(
+			_dictionary_int(schema_seven_migrated, "hero_bond_level", -1),
+			0,
+			"schema 7 hero bond initialized"
+		)
+		_expect_equal_int(
+			_dictionary_int(schema_seven_migrated, "next_hero_mission_unix", -1),
+			0,
+			"schema 7 hero mission cooldown initialized"
 		)
 
 
@@ -437,12 +475,22 @@ func _test_hero_data() -> void:
 			not _dictionary_string(candidate, "effect", "").is_empty(),
 			"hero candidate effect"
 		)
+		_expect_true(
+			not _dictionary_string(candidate, "mission_type", "").is_empty(),
+			"hero candidate mission type"
+		)
+		_expect_true(
+			not _dictionary_string(candidate, "mission_title", "").is_empty(),
+			"hero candidate mission title"
+		)
 
 
 func _test_hero_selection() -> void:
 	var previous_mouse_count: int = GameManager.mouse_count
 	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
 	var previous_hero_id: String = GameManager.selected_hero_id
+	var previous_bond_level: int = GameManager.hero_bond_level
+	var previous_hero_cooldown: int = GameManager.next_hero_mission_unix
 	var previous_stage_index: int = GameManager.current_stage_index
 	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
 	var previous_golden: float = GameManager.golden_remaining
@@ -455,6 +503,8 @@ func _test_hero_selection() -> void:
 		"builder": 0
 	}
 	GameManager.selected_hero_id = ""
+	GameManager.hero_bond_level = 0
+	GameManager.next_hero_mission_unix = 0
 	_expect_true(not GameManager.recruit_hero("dandani"), "hero selection locked")
 	GameManager.mouse_count = 5
 	GameManager.role_assignments = {
@@ -536,6 +586,8 @@ func _test_hero_selection() -> void:
 	GameManager.mouse_count = previous_mouse_count
 	GameManager.role_assignments = previous_roles
 	GameManager.selected_hero_id = previous_hero_id
+	GameManager.hero_bond_level = previous_bond_level
+	GameManager.next_hero_mission_unix = previous_hero_cooldown
 	GameManager.current_stage_index = previous_stage_index
 	GameManager.region_progress = previous_region_progress
 	GameManager.golden_remaining = previous_golden
@@ -557,6 +609,146 @@ func _test_hero_choice_input() -> void:
 	)
 	_expect_true(hero_view.preview_hero_id == "saebyeok", "hero preview state")
 	hero_view.free()
+
+
+func _test_hero_bond_missions() -> void:
+	var previous_cheese: float = GameManager.cheese
+	var previous_total_cheese: float = GameManager.total_cheese
+	var previous_mouse_count: int = GameManager.mouse_count
+	var previous_carry_level: int = GameManager.carry_level
+	var previous_stage_index: int = GameManager.current_stage_index
+	var previous_highest_stage: int = GameManager.highest_unlocked_stage_index
+	var previous_unlocked: Array[String] = GameManager.unlocked_stage_ids.duplicate()
+	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
+	var previous_hero_id: String = GameManager.selected_hero_id
+	var previous_bond_level: int = GameManager.hero_bond_level
+	var previous_cooldown: int = GameManager.next_hero_mission_unix
+	var previous_golden: float = GameManager.golden_remaining
+	var previous_total_trips: int = GameManager.total_trips
+
+	GameManager.cheese = 0.0
+	GameManager.total_cheese = 0.0
+	GameManager.mouse_count = 5
+	GameManager.carry_level = 0
+	GameManager.current_stage_index = 0
+	GameManager.highest_unlocked_stage_index = 0
+	GameManager.unlocked_stage_ids = []
+	GameManager.role_assignments = {
+		"gatherer": 5,
+		"explorer": 0,
+		"builder": 0
+	}
+	GameManager.selected_hero_id = ""
+	GameManager.hero_bond_level = 0
+	GameManager.next_hero_mission_unix = 0
+	GameManager.golden_remaining = 0.0
+	GameManager.total_trips = 0
+	_expect_true(
+		GameManager.resolve_hero_mission("dandani", 0).is_empty(),
+		"hero mission requires selected hero"
+	)
+	GameManager.selected_hero_id = "dandani"
+	_expect_true(
+		GameManager.resolve_hero_mission("saebyeok", 0).is_empty(),
+		"hero mission rejects different hero"
+	)
+	var first_result: Dictionary = GameManager.resolve_hero_mission("dandani", 2)
+	_expect_true(not first_result.is_empty(), "hero mission resolves")
+	_expect_equal_int(GameManager.hero_bond_level, 1, "hero mission raises bond")
+	_expect_true(
+		GameManager.get_hero_mission_cooldown() > 0,
+		"hero mission starts cooldown"
+	)
+	_expect_true(
+		_dictionary_int(first_result, "reward", 0) > 0,
+		"hero mission grants reward"
+	)
+	_expect_equal_int(
+		_dictionary_int(first_result, "mistakes", -1),
+		2,
+		"hero mission reports mistakes"
+	)
+	_expect_true(
+		_dictionary_bool(first_result, "bond_increased", false),
+		"hero mission reports bond increase"
+	)
+	_expect_true(
+		GameManager.resolve_hero_mission("dandani", 0).is_empty(),
+		"hero mission blocks during cooldown"
+	)
+	for expected_bond: int in [2, 3]:
+		GameManager.next_hero_mission_unix = 0
+		var result: Dictionary = GameManager.resolve_hero_mission("dandani", 0)
+		_expect_true(not result.is_empty(), "repeat hero mission resolves")
+		_expect_equal_int(
+			GameManager.hero_bond_level,
+			expected_bond,
+			"repeat hero mission raises bond"
+		)
+	GameManager.next_hero_mission_unix = 0
+	var capped_result: Dictionary = GameManager.resolve_hero_mission("dandani", 0)
+	_expect_equal_int(GameManager.hero_bond_level, 3, "hero bond level cap")
+	_expect_true(
+		not _dictionary_bool(capped_result, "bond_increased", true),
+		"capped hero mission still rewards without bond increase"
+	)
+	_expect_equal_float(
+		GameManager.get_gather_hero_multiplier(),
+		1.16,
+		"dandani bond effect"
+	)
+	GameManager.selected_hero_id = "saebyeok"
+	_expect_equal_float(
+		GameManager.get_region_activity_multiplier(),
+		1.3,
+		"saebyeok bond effect"
+	)
+	GameManager.selected_hero_id = "boreum"
+	_expect_equal_int(
+		GameManager.get_nursery_care_reduction_seconds(),
+		26,
+		"boreum bond effect"
+	)
+
+	GameManager.cheese = previous_cheese
+	GameManager.total_cheese = previous_total_cheese
+	GameManager.mouse_count = previous_mouse_count
+	GameManager.carry_level = previous_carry_level
+	GameManager.current_stage_index = previous_stage_index
+	GameManager.highest_unlocked_stage_index = previous_highest_stage
+	GameManager.unlocked_stage_ids = previous_unlocked
+	GameManager.role_assignments = previous_roles
+	GameManager.selected_hero_id = previous_hero_id
+	GameManager.hero_bond_level = previous_bond_level
+	GameManager.next_hero_mission_unix = previous_cooldown
+	GameManager.golden_remaining = previous_golden
+	GameManager.total_trips = previous_total_trips
+
+
+func _test_hero_bond_input() -> void:
+	for hero: Dictionary in GameManager.get_hero_candidates():
+		var hero_id: String = _dictionary_string(hero, "id", "")
+		var bond_view: HeroBondView = HeroBondView.new()
+		bond_view.size = Vector2(500.0, 290.0)
+		bond_view.setup(hero)
+		_expect_true(
+			not bond_view.submit_point(Vector2(-100.0, -100.0)),
+			"%s mission rejects distant input" % hero_id
+		)
+		_expect_equal_int(bond_view.mistakes, 1, "%s mission counts mistake" % hero_id)
+		_expect_equal_int(bond_view.step, 0, "%s mission keeps first step" % hero_id)
+		for step_index: int in range(HeroBondView.TOTAL_STEPS):
+			_expect_true(
+				bond_view.submit_point(bond_view.get_active_target_position()),
+				"%s mission accepts step %d" % [hero_id, step_index + 1]
+			)
+		_expect_true(bond_view.finished, "%s mission finishes" % hero_id)
+		_expect_equal_int(
+			bond_view.step,
+			HeroBondView.TOTAL_STEPS,
+			"%s mission completes all steps" % hero_id
+		)
+		bond_view.free()
 
 
 func _test_upgrade_costs() -> void:
@@ -768,6 +960,7 @@ func _test_region_events() -> void:
 	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
 	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
 	var previous_hero_id: String = GameManager.selected_hero_id
+	var previous_bond_level: int = GameManager.hero_bond_level
 
 	GameManager.current_stage_index = 0
 	GameManager.highest_unlocked_stage_index = 0
@@ -784,6 +977,7 @@ func _test_region_events() -> void:
 		"builder": 0
 	}
 	GameManager.selected_hero_id = ""
+	GameManager.hero_bond_level = 0
 	GameManager.region_progress["old_kitchen"] = {
 		"action_level": 0,
 		"risk_level": 2,
@@ -872,6 +1066,7 @@ func _test_region_events() -> void:
 		"builder": 0
 	}
 	GameManager.selected_hero_id = "saebyeok"
+	GameManager.hero_bond_level = 0
 	var scout_result: Dictionary = GameManager.resolve_region_event(0)
 	_expect_equal_int(
 		_dictionary_int(scout_result, "reward", 0),
@@ -922,6 +1117,7 @@ func _test_region_events() -> void:
 	GameManager.region_progress = previous_region_progress
 	GameManager.role_assignments = previous_roles
 	GameManager.selected_hero_id = previous_hero_id
+	GameManager.hero_bond_level = previous_bond_level
 
 
 func _test_field_action_data() -> void:
@@ -969,6 +1165,7 @@ func _test_field_action_resolution() -> void:
 	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
 	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
 	var previous_hero_id: String = GameManager.selected_hero_id
+	var previous_bond_level: int = GameManager.hero_bond_level
 
 	GameManager.current_stage_index = 0
 	GameManager.highest_unlocked_stage_index = 0
@@ -985,6 +1182,7 @@ func _test_field_action_resolution() -> void:
 		"builder": 0
 	}
 	GameManager.selected_hero_id = ""
+	GameManager.hero_bond_level = 0
 	GameManager.region_progress["old_kitchen"] = {
 		"action_level": 0,
 		"risk_level": 2,
@@ -1073,6 +1271,7 @@ func _test_field_action_resolution() -> void:
 	GameManager.region_progress = previous_region_progress
 	GameManager.role_assignments = previous_roles
 	GameManager.selected_hero_id = previous_hero_id
+	GameManager.hero_bond_level = previous_bond_level
 
 
 func _test_dot_action_input() -> void:
@@ -1309,6 +1508,8 @@ func _test_save_round_trip() -> void:
 			"builder": 1
 		},
 		"selected_hero_id": "saebyeok",
+		"hero_bond_level": 2,
+		"next_hero_mission_unix": TimeManager.current_unix_time() + 30,
 		"tutorial_step": 4,
 		"play_time_seconds": 99.0,
 		"total_trips": 12,
@@ -1343,6 +1544,16 @@ func _test_save_round_trip() -> void:
 	_expect_true(
 		_dictionary_string(loaded, "selected_hero_id", "") == "saebyeok",
 		"save/load selected hero"
+	)
+	_expect_equal_int(
+		_dictionary_int(loaded, "hero_bond_level", 0),
+		2,
+		"save/load hero bond"
+	)
+	_expect_true(
+		_dictionary_int(loaded, "next_hero_mission_unix", 0)
+		> TimeManager.current_unix_time(),
+		"save/load hero mission cooldown"
 	)
 
 
@@ -1483,8 +1694,12 @@ func _test_ui_layout() -> void:
 	GameManager.mouse_count = previous_mouse_count
 	GameManager.role_assignments = previous_roles
 	var previous_hero_id: String = GameManager.selected_hero_id
+	var previous_bond_level: int = GameManager.hero_bond_level
+	var previous_hero_cooldown: int = GameManager.next_hero_mission_unix
 	GameManager.mouse_count = 5
 	GameManager.selected_hero_id = ""
+	GameManager.hero_bond_level = 0
+	GameManager.next_hero_mission_unix = 0
 	game_ui.call("_show_hero_panel")
 	await get_tree().process_frame
 	_expect_true(game_ui.hero_panel.visible, "portrait hero panel opens")
@@ -1497,8 +1712,25 @@ func _test_ui_layout() -> void:
 	game_ui.call("_on_hero_candidate_pressed", "saebyeok")
 	_expect_true(not game_ui.hero_confirm_button.disabled, "hero preview enables confirm")
 	game_ui.call("_hide_hero_panel")
+	GameManager.selected_hero_id = "dandani"
+	GameManager.hero_bond_level = 1
+	GameManager.next_hero_mission_unix = 0
+	game_ui.call("_show_hero_panel")
+	await get_tree().process_frame
+	_expect_true(game_ui.hero_bond_view.visible, "hero bond mission opens")
+	_expect_true(
+		game_ui.hero_bond_view.mission_type == "balance",
+		"hero bond mission matches selected hero"
+	)
+	_expect_true(
+		game_ui.hero_panel.get_global_rect().end.y <= host.size.y,
+		"portrait hero bond panel bottom bound"
+	)
+	game_ui.call("_hide_hero_panel")
 	GameManager.mouse_count = previous_mouse_count
 	GameManager.selected_hero_id = previous_hero_id
+	GameManager.hero_bond_level = previous_bond_level
+	GameManager.next_hero_mission_unix = previous_hero_cooldown
 	GameManager.current_stage_index = previous_stage_index
 	GameManager.next_field_action_unix = previous_field_cooldown
 	GameManager.next_region_event_unix = previous_cooldown

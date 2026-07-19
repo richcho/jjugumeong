@@ -36,6 +36,13 @@
 | 단단이 | 일반 채집과 예상 생산 +10% | `HERO_GATHER_MULTIPLIER` |
 | 새벽 | 지역 사건·현장 행동 보상 +15% | `HERO_REGION_MULTIPLIER` |
 | 보름 | 돌봄 1회 시간 단축 20초 | `HERO_CARE_REDUCTION_SECONDS` |
+| 영웅 유대 최대 | Lv.3 | `HERO_MAX_BOND_LEVEL` |
+| 영웅 임무 | 점 5단계, 재도전 60초 | `HeroBondView`, `HERO_MISSION_COOLDOWN_SECONDS` |
+| 영웅 임무 보상 | 현재 운반량 3회분 | `HERO_MISSION_REWARD_TRIPS` |
+
+유대 Lv.마다 단단이는 일반 채집 효과가 2%p, 새벽은 지역 활동 효과가 5%p,
+보름은 돌봄 단축 시간이 2초 증가합니다. 따라서 유대 Lv.3 최대 효과는 각각
+16%, 30%, 26초입니다. 최대 유대 뒤에도 임무 보상은 반복 지급합니다.
 
 강화 비용 공식:
 

@@ -63,6 +63,8 @@ var role_button: Button
 var hero_panel: PanelContainer
 var hero_summary: Label
 var hero_view: HeroChoiceView
+var hero_bond_view: HeroBondView
+var hero_mission_status: Label
 var hero_confirm_button: Button
 var hero_button: Button
 
@@ -503,6 +505,19 @@ func _build_hero_panel() -> void:
 	hero_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	hero_view.candidate_pressed.connect(_on_hero_candidate_pressed)
 	content.add_child(hero_view)
+	hero_bond_view = HeroBondView.new()
+	hero_bond_view.custom_minimum_size = Vector2(0.0, 290.0)
+	hero_bond_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hero_bond_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hero_bond_view.status_changed.connect(_on_hero_mission_status_changed)
+	hero_bond_view.mission_completed.connect(_resolve_hero_bond_mission)
+	hero_bond_view.hide()
+	content.add_child(hero_bond_view)
+	hero_mission_status = _make_label("", 14, Color("#bcd8d4"))
+	hero_mission_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hero_mission_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hero_mission_status.hide()
+	content.add_child(hero_mission_status)
 	hero_confirm_button = _make_button(
 		"후보 점을 먼저 선택하세요",
 		_on_hero_confirm_pressed,
@@ -647,8 +662,16 @@ func _refresh_all() -> void:
 			else "영웅 · 쥐 %d" % GameManager.HERO_UNLOCK_MOUSE_COUNT
 		)
 	)
-	if hero_panel.visible:
-		_refresh_hero_panel()
+	if (
+		hero_panel.visible
+		and not selected_hero.is_empty()
+		and not hero_bond_view.visible
+	):
+		var hero_cooldown: int = GameManager.get_hero_mission_cooldown()
+		if hero_cooldown > 0:
+			hero_mission_status.text = "다음 영웅 임무까지 %d초" % hero_cooldown
+		else:
+			_refresh_hero_panel()
 
 	var reward: Dictionary = GameManager.get_next_reward_summary()
 	var reward_current: float = _dictionary_float(reward, "current", 0.0)
@@ -685,7 +708,7 @@ func _update_responsive_layout() -> void:
 	bottom_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom_panel.offset_left = side_margin
 	bottom_panel.offset_right = -side_margin
-	bottom_panel.offset_top = -118.0 if not compact_layout else -198.0
+	bottom_panel.offset_top = -150.0 if not compact_layout else -220.0
 	bottom_panel.offset_bottom = -18.0
 	button_grid.columns = 4 if not compact_layout else 2
 	next_reward_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -1169,16 +1192,38 @@ func _refresh_hero_panel() -> void:
 	var selected: Dictionary = GameManager.get_selected_hero()
 	hero_view.setup(candidates, _preview_hero_id)
 	if not selected.is_empty():
-		hero_summary.text = "%s · %s\n%s\n효과: %s" % [
+		hero_view.hide()
+		hero_mission_status.show()
+		var cooldown: int = GameManager.get_hero_mission_cooldown()
+		hero_summary.text = "%s · %s · 유대 Lv.%d/%d\n%s\n현재 효과: %s" % [
 			_dictionary_string(selected, "name", "첫 영웅"),
 			_dictionary_string(selected, "title", ""),
+			GameManager.hero_bond_level,
+			GameManager.HERO_MAX_BOND_LEVEL,
 			_dictionary_string(selected, "story", ""),
-			_dictionary_string(selected, "effect", "")
+			GameManager.get_selected_hero_effect_summary()
 		]
-		hero_confirm_button.text = "첫 영웅 선택 완료"
+		if cooldown > 0:
+			hero_bond_view.hide()
+			hero_mission_status.text = "다음 영웅 임무까지 %d초" % cooldown
+		else:
+			hero_bond_view.show()
+			hero_bond_view.setup(selected)
+			hero_mission_status.text = "%s\n%s" % [
+				_dictionary_string(selected, "mission_title", "영웅 임무"),
+				_dictionary_string(
+					selected,
+					"mission_description",
+					"빛나는 점을 순서대로 누르세요."
+				)
+			]
+		hero_confirm_button.text = "첫 영웅 선택 완료 · 임무는 점을 직접 조작"
 		hero_confirm_button.disabled = true
 		hero_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		return
+	hero_bond_view.hide()
+	hero_mission_status.hide()
+	hero_view.show()
 	if not GameManager.is_hero_selection_unlocked():
 		hero_summary.text = (
 			"쥐 %d마리에서 첫 영웅 선택 · 현재 %d마리\n"
@@ -1226,6 +1271,26 @@ func _on_hero_confirm_pressed() -> void:
 	if _preview_hero_id.is_empty():
 		return
 	GameManager.recruit_hero(_preview_hero_id)
+	_refresh_hero_panel()
+
+
+func _on_hero_mission_status_changed(status_text: String) -> void:
+	if hero_bond_view.visible:
+		hero_mission_status.text = status_text
+
+
+func _resolve_hero_bond_mission(hero_id: String, mistakes: int) -> void:
+	var result: Dictionary = GameManager.resolve_hero_mission(hero_id, mistakes)
+	if result.is_empty():
+		hero_mission_status.text = "임무 완료를 기록하지 못했습니다."
+		return
+	_show_toast(
+		"%s 완료 · 유대 Lv.%d · 치즈 +%s" % [
+			_dictionary_string(result, "mission_title", "영웅 임무"),
+			_dictionary_int(result, "bond_level", 0),
+			_format_number(_dictionary_float(result, "reward", 0.0))
+		]
+	)
 	_refresh_hero_panel()
 
 
