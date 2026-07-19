@@ -51,9 +51,9 @@ func _test_time_cap() -> void:
 func _test_build_info() -> void:
 	_expect_true(GameManager.display_name == "쥐구멍", "build display name")
 	_expect_true(GameManager.product_name == "r4", "build product name")
-	_expect_true(GameManager.build_version == "0.3.2", "build version")
+	_expect_true(GameManager.build_version == "0.3.3", "build version")
 	_expect_true(GameManager.build_phase == "V0.3 Alpha", "build phase")
-	_expect_true(GameManager.get_build_label() == "r4 0.3.2", "build label")
+	_expect_true(GameManager.get_build_label() == "r4 0.3.3", "build label")
 
 
 func _test_save_schema_migration() -> void:
@@ -72,7 +72,8 @@ func _test_save_schema_migration() -> void:
 		"completed_region_event_ids": [],
 		"next_region_event_unix": 0,
 		"completed_field_action_ids": [],
-		"next_field_action_unix": 0
+		"next_field_action_unix": 0,
+		"region_progress": {}
 	}
 	var migrated_value: Variant = SaveManager.call("_migrate_data", legacy, defaults)
 	_expect_true(migrated_value is Dictionary, "schema 1 migration result type")
@@ -81,7 +82,7 @@ func _test_save_schema_migration() -> void:
 		var migrated: Dictionary = migrated_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(migrated, "schema_version", 0),
-			3,
+			4,
 			"schema migration version"
 		)
 		_expect_equal_int(
@@ -111,7 +112,7 @@ func _test_save_schema_migration() -> void:
 		var schema_two_migrated: Dictionary = schema_two_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(schema_two_migrated, "schema_version", 0),
-			3,
+			4,
 			"schema 2 migration version"
 		)
 		_expect_equal_int(
@@ -329,6 +330,7 @@ func _test_region_events() -> void:
 	var previous_completed: Array[String] = GameManager.completed_region_event_ids.duplicate()
 	var previous_cooldown: int = GameManager.next_region_event_unix
 	var previous_boost: float = GameManager.click_boost_remaining
+	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
 
 	GameManager.current_stage_index = 0
 	GameManager.highest_unlocked_stage_index = 0
@@ -339,13 +341,20 @@ func _test_region_events() -> void:
 	GameManager.golden_remaining = 0.0
 	GameManager.completed_region_event_ids.clear()
 	GameManager.next_region_event_unix = 0
+	GameManager.region_progress["old_kitchen"] = {
+		"action_level": 0,
+		"risk_level": 2,
+		"route_unlocked": false,
+		"flags": [],
+		"last_choice_id": ""
+	}
 	var region_event: Dictionary = GameManager.get_current_region_event()
 	var choices_value: Variant = region_event.get("choices", [])
 	_expect_true(choices_value is Array, "region event choices type")
 	if choices_value is Array:
 		@warning_ignore("unsafe_cast")
 		var choices: Array = choices_value as Array
-		_expect_equal_int(choices.size(), 2, "region event has two choices")
+		_expect_equal_int(choices.size(), 3, "region event includes expert choice")
 	var result: Dictionary = GameManager.resolve_region_event(0)
 	_expect_true(not result.is_empty(), "region event resolves")
 	_expect_true(
@@ -390,6 +399,30 @@ func _test_region_events() -> void:
 		0,
 		"repeat region event has no discovery bonus"
 	)
+	GameManager.current_stage_index = 0
+	GameManager.highest_unlocked_stage_index = 0
+	GameManager.unlocked_stage_ids = ["old_kitchen"]
+	GameManager.next_region_event_unix = 0
+	GameManager.region_progress["old_kitchen"] = {
+		"action_level": 3,
+		"risk_level": 1,
+		"route_unlocked": true,
+		"flags": ["thread_route"],
+		"last_choice_id": ""
+	}
+	var expert_event: Dictionary = GameManager.get_current_region_event()
+	var expert_choices_value: Variant = expert_event.get("choices", [])
+	if expert_choices_value is Array:
+		@warning_ignore("unsafe_cast")
+		var expert_choices: Array = expert_choices_value as Array
+		@warning_ignore("unsafe_cast")
+		var expert_choice: Dictionary = expert_choices[2] as Dictionary
+		_expect_true(
+			not _dictionary_bool(expert_choice, "locked", true),
+			"expert region choice unlocks at mastery 3"
+		)
+	var expert_result: Dictionary = GameManager.resolve_region_event(2)
+	_expect_true(not expert_result.is_empty(), "expert region choice resolves")
 
 	GameManager.current_stage_index = previous_stage_index
 	GameManager.highest_unlocked_stage_index = previous_highest_index
@@ -402,6 +435,7 @@ func _test_region_events() -> void:
 	GameManager.completed_region_event_ids = previous_completed
 	GameManager.next_region_event_unix = previous_cooldown
 	GameManager.click_boost_remaining = previous_boost
+	GameManager.region_progress = previous_region_progress
 
 
 func _test_field_action_data() -> void:
@@ -410,14 +444,6 @@ func _test_field_action_data() -> void:
 	for stage_index: int in range(GameManager.stages.size()):
 		var stage: Dictionary = GameManager.stages[stage_index]
 		var action_value: Variant = stage.get("field_action", {})
-		if stage_index >= 3:
-			var later_action_empty: bool = false
-			if action_value is Dictionary:
-				@warning_ignore("unsafe_cast")
-				var later_action: Dictionary = action_value as Dictionary
-				later_action_empty = later_action.is_empty()
-			_expect_true(later_action_empty, "later region field action remains out of scope")
-			continue
 		_expect_true(action_value is Dictionary, "field action data type")
 		if not action_value is Dictionary:
 			continue
@@ -440,7 +466,7 @@ func _test_field_action_data() -> void:
 		)
 		action_ids.append(action_id)
 		action_types.append(action_type)
-	_expect_equal_int(action_ids.size(), 3, "field action prototype count")
+	_expect_equal_int(action_ids.size(), 5, "field action count")
 
 
 func _test_field_action_resolution() -> void:
@@ -454,6 +480,7 @@ func _test_field_action_resolution() -> void:
 	var previous_unlocked_ids: Array[String] = GameManager.unlocked_stage_ids.duplicate()
 	var previous_completed: Array[String] = GameManager.completed_field_action_ids.duplicate()
 	var previous_cooldown: int = GameManager.next_field_action_unix
+	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
 
 	GameManager.current_stage_index = 0
 	GameManager.highest_unlocked_stage_index = 0
@@ -464,6 +491,13 @@ func _test_field_action_resolution() -> void:
 	GameManager.golden_remaining = 0.0
 	GameManager.completed_field_action_ids.clear()
 	GameManager.next_field_action_unix = 0
+	GameManager.region_progress["old_kitchen"] = {
+		"action_level": 0,
+		"risk_level": 2,
+		"route_unlocked": false,
+		"flags": [],
+		"last_choice_id": ""
+	}
 	_expect_true(
 		GameManager.resolve_field_action("wrong_action", 0).is_empty(),
 		"wrong field action id is rejected"
@@ -496,6 +530,16 @@ func _test_field_action_resolution() -> void:
 		GameManager.completed_field_action_ids.has("kitchen_thread_tangle"),
 		"field action completion recorded"
 	)
+	var first_state: Dictionary = _dictionary_dictionary(first_result, "region_state")
+	_expect_true(
+		_dictionary_bool(first_state, "route_unlocked", false),
+		"field action opens safe route"
+	)
+	_expect_equal_int(
+		_dictionary_int(first_state, "action_level", 0),
+		1,
+		"field action raises mastery"
+	)
 	_expect_true(GameManager.get_field_action_cooldown() > 0, "field action cooldown")
 	_expect_true(
 		GameManager.resolve_field_action("kitchen_thread_tangle", 0).is_empty(),
@@ -518,7 +562,7 @@ func _test_field_action_resolution() -> void:
 	)
 	_expect_equal_int(
 		_dictionary_int(repeat_result, "reward", 0),
-		75,
+		105,
 		"repeat field action base reward"
 	)
 
@@ -532,10 +576,11 @@ func _test_field_action_resolution() -> void:
 	GameManager.unlocked_stage_ids = previous_unlocked_ids
 	GameManager.completed_field_action_ids = previous_completed
 	GameManager.next_field_action_unix = previous_cooldown
+	GameManager.region_progress = previous_region_progress
 
 
 func _test_dot_action_input() -> void:
-	for action_type: String in ["untangle", "tower", "infinite"]:
+	for action_type: String in ["untangle", "tower", "infinite", "timing", "route"]:
 		var action_view: DotActionView = DotActionView.new()
 		action_view.size = Vector2(500.0, 280.0)
 		action_view.setup({
@@ -549,6 +594,8 @@ func _test_dot_action_input() -> void:
 		_expect_equal_int(action_view.mistakes, 1, "dot action mistake count")
 		var safety: int = 0
 		while not action_view.finished and safety < 12:
+			if action_type == "timing":
+				action_view.elapsed = 0.0
 			var target: Vector2 = action_view.get_active_target_position()
 			_expect_true(target != Vector2.ZERO, "dot action target: %s" % action_type)
 			_expect_true(
@@ -743,6 +790,15 @@ func _test_save_round_trip() -> void:
 		"next_region_event_unix": 0,
 		"completed_field_action_ids": ["kitchen_thread_tangle"],
 		"next_field_action_unix": 0,
+		"region_progress": {
+			"old_kitchen": {
+				"action_level": 1,
+				"risk_level": 1,
+				"route_unlocked": true,
+				"flags": ["thread_route"],
+				"last_choice_id": "kitchen_cat_patrol_0"
+			}
+		},
 		"tutorial_step": 4,
 		"play_time_seconds": 99.0,
 		"total_trips": 12,
@@ -811,7 +867,11 @@ func _test_ui_layout() -> void:
 	game_ui.call("_show_region_event")
 	await get_tree().process_frame
 	_expect_true(game_ui.region_event_panel.visible, "portrait region event opens")
-	_expect_equal_int(game_ui.region_choice_buttons.size(), 2, "region event button count")
+	_expect_equal_int(game_ui.region_choice_buttons.size(), 3, "region event button count")
+	_expect_true(
+		game_ui.region_choice_buttons[2].disabled,
+		"expert region choice shows locked requirement"
+	)
 	_expect_true(
 		game_ui.region_event_panel.get_global_rect().end.y <= host.size.y,
 		"portrait region event bottom bound"
@@ -954,6 +1014,14 @@ func _dictionary_string(data: Dictionary, key: String, fallback: String) -> Stri
 	if value is String:
 		return value
 	return fallback
+
+
+func _dictionary_dictionary(data: Dictionary, key: String) -> Dictionary:
+	var value: Variant = data.get(key, {})
+	if value is Dictionary:
+		@warning_ignore("unsafe_cast")
+		return value as Dictionary
+	return {}
 
 
 func _expect_true(actual: bool, label: String) -> void:

@@ -32,6 +32,7 @@ var completed_region_event_ids: Array[String] = []
 var next_region_event_unix: int = 0
 var completed_field_action_ids: Array[String] = []
 var next_field_action_unix: int = 0
+var region_progress: Dictionary = {}
 var tutorial_step: int = 0
 var golden_remaining: float = 0.0
 var click_boost_remaining: float = 0.0
@@ -58,6 +59,7 @@ func _ready() -> void:
 	var loaded_data: Dictionary = SaveManager.load_game(_default_save_data())
 	_apply_save_data(loaded_data)
 	_reconcile_unlocked_stages()
+	_reconcile_region_progress()
 	_calculate_offline_reward()
 	_next_golden_event = randf_range(GOLDEN_EVENT_MIN_DELAY, GOLDEN_EVENT_MAX_DELAY)
 	_is_ready = true
@@ -216,7 +218,19 @@ func get_stage_bonus() -> float:
 	if stages.is_empty():
 		return 1.0
 	var stage: Dictionary = stages[current_stage_index]
-	return _dictionary_float(stage, "production_bonus", 1.0)
+	var bonus: float = _dictionary_float(stage, "production_bonus", 1.0)
+	var state: Dictionary = get_region_state(_dictionary_string(stage, "id", ""))
+	if _dictionary_bool(state, "route_unlocked", false):
+		bonus *= 1.05
+	return bonus
+
+
+func get_region_state(stage_id: String) -> Dictionary:
+	var value: Variant = region_progress.get(stage_id, {})
+	if value is Dictionary:
+		@warning_ignore("unsafe_cast")
+		return (value as Dictionary).duplicate(true)
+	return {}
 
 
 func get_current_stage() -> Dictionary:
@@ -252,6 +266,8 @@ func get_region_codex_entries() -> Array[Dictionary]:
 		var event_id: String = _dictionary_string(region_event, "id", "")
 		var field_action: Dictionary = _dictionary_dictionary(stage, "field_action")
 		var action_id: String = _dictionary_string(field_action, "id", "")
+		var stage_id: String = _dictionary_string(stage, "id", "")
+		var region_state: Dictionary = get_region_state(stage_id)
 		result.append({
 			"stage_index": index,
 			"stage_id": _dictionary_string(stage, "id", ""),
@@ -265,6 +281,9 @@ func get_region_codex_entries() -> Array[Dictionary]:
 				not action_id.is_empty()
 				and completed_field_action_ids.has(action_id)
 			),
+			"action_level": _dictionary_int(region_state, "action_level", 0),
+			"risk_level": _dictionary_int(region_state, "risk_level", 2),
+			"route_unlocked": _dictionary_bool(region_state, "route_unlocked", false),
 			"current": index == current_stage_index
 		})
 	return result
@@ -323,7 +342,28 @@ func get_current_region_event() -> Dictionary:
 	var event_value: Variant = stage.get("choice_event", {})
 	if event_value is Dictionary:
 		@warning_ignore("unsafe_cast")
-		return (event_value as Dictionary).duplicate(true)
+		var region_event: Dictionary = (event_value as Dictionary).duplicate(true)
+		var choices_value: Variant = region_event.get("choices", [])
+		var expert_choice: Dictionary = _dictionary_dictionary(
+			region_event,
+			"expert_choice"
+		).duplicate(true)
+		if choices_value is Array and not expert_choice.is_empty():
+			@warning_ignore("unsafe_cast")
+			var choices: Array = (choices_value as Array).duplicate(true)
+			var stage_id: String = _dictionary_string(stage, "id", "")
+			var state: Dictionary = get_region_state(stage_id)
+			var required_level: int = _dictionary_int(
+				expert_choice,
+				"requires_action_level",
+				3
+			)
+			var current_level: int = _dictionary_int(state, "action_level", 0)
+			expert_choice["locked"] = current_level < required_level
+			expert_choice["lock_reason"] = "현장 행동 숙련 Lv.%d 필요" % required_level
+			choices.append(expert_choice)
+			region_event["choices"] = choices
+		return region_event
 	return {}
 
 
@@ -349,12 +389,18 @@ func resolve_region_event(choice_index: int) -> Dictionary:
 		return {}
 	@warning_ignore("unsafe_cast")
 	var choice: Dictionary = choice_value as Dictionary
+	if _dictionary_bool(choice, "locked", false):
+		return {}
 	var event_id: String = _dictionary_string(region_event, "id", "")
 	var first_discovery: bool = (
 		not event_id.is_empty()
 		and not completed_region_event_ids.has(event_id)
 	)
 	var reward_trips: int = maxi(1, _dictionary_int(choice, "reward_trips", 1))
+	var stage_id: String = _dictionary_string(get_current_stage(), "id", "")
+	var region_state: Dictionary = get_region_state(stage_id)
+	if _dictionary_bool(region_state, "route_unlocked", false):
+		reward_trips += 1
 	var first_reward_trips: int = 0
 	if first_discovery:
 		first_reward_trips = maxi(
@@ -367,11 +413,25 @@ func resolve_region_event(choice_index: int) -> Dictionary:
 		get_carry_capacity() * (reward_trips + first_reward_trips)
 	)
 	var first_discovery_reward: int = maxi(0, reward - base_reward)
-	if _dictionary_string(choice, "effect", "secure") == "rush":
+	var choice_effect: String = _dictionary_string(choice, "effect", "secure")
+	if choice_effect == "rush":
 		var boost_seconds: float = _dictionary_float(choice, "boost_seconds", 8.0)
 		click_boost_remaining = maxf(click_boost_remaining, boost_seconds)
 		total_click_boosts += 1
 		EventBus.click_boost_changed.emit(true, click_boost_remaining)
+	var default_risk_delta: int = 1 if choice_effect == "rush" else -1
+	var risk_delta: int = _dictionary_int(choice, "risk_delta", default_risk_delta)
+	region_state["risk_level"] = clampi(
+		_dictionary_int(region_state, "risk_level", 2) + risk_delta,
+		0,
+		3
+	)
+	region_state["last_choice_id"] = _dictionary_string(
+		choice,
+		"id",
+		"%s_%d" % [event_id, choice_index]
+	)
+	region_progress[stage_id] = region_state
 	next_region_event_unix = TimeManager.current_unix_time() + REGION_EVENT_COOLDOWN_SECONDS
 	EventBus.game_state_changed.emit()
 	save_now()
@@ -381,7 +441,8 @@ func resolve_region_event(choice_index: int) -> Dictionary:
 		"reward": reward,
 		"first_discovery": first_discovery,
 		"first_discovery_reward": first_discovery_reward,
-		"boosted": _dictionary_string(choice, "effect", "secure") == "rush"
+		"boosted": choice_effect == "rush",
+		"region_state": region_state
 	}
 
 
@@ -415,8 +476,13 @@ func resolve_field_action(action_id: String, mistakes: int) -> Dictionary:
 	var current_action_id: String = _dictionary_string(action, "id", "")
 	if action_id.is_empty() or action_id != current_action_id:
 		return {}
+	var stage_id: String = _dictionary_string(get_current_stage(), "id", "")
+	var state: Dictionary = get_region_state(stage_id)
+	var previous_level: int = _dictionary_int(state, "action_level", 0)
 	var first_completion: bool = not completed_field_action_ids.has(action_id)
 	var reward_trips: int = maxi(1, _dictionary_int(action, "reward_trips", 1))
+	if previous_level >= 1:
+		reward_trips += 1
 	var first_reward_trips: int = 0
 	if first_completion:
 		first_reward_trips = maxi(
@@ -424,10 +490,19 @@ func resolve_field_action(action_id: String, mistakes: int) -> Dictionary:
 			_dictionary_int(action, "first_completion_reward_trips", 0)
 		)
 		completed_field_action_ids.append(action_id)
+	state["action_level"] = mini(3, previous_level + 1)
+	state["route_unlocked"] = true
+	state["risk_level"] = maxi(0, _dictionary_int(state, "risk_level", 2) - 1)
+	var flags: Array[String] = _dictionary_string_array(state, "flags")
+	var result_flag: String = _dictionary_string(action, "result_flag", "")
+	if not result_flag.is_empty() and not flags.has(result_flag):
+		flags.append(result_flag)
+	state["flags"] = flags
 	var base_reward: int = _calculate_trip_reward(get_carry_capacity() * reward_trips)
 	var reward: int = collect_trip(
 		get_carry_capacity() * (reward_trips + first_reward_trips)
 	)
+	region_progress[stage_id] = state
 	next_field_action_unix = (
 		TimeManager.current_unix_time() + FIELD_ACTION_COOLDOWN_SECONDS
 	)
@@ -439,7 +514,8 @@ func resolve_field_action(action_id: String, mistakes: int) -> Dictionary:
 		"reward": reward,
 		"first_completion": first_completion,
 		"first_completion_reward": maxi(0, reward - base_reward),
-		"mistakes": maxi(0, mistakes)
+		"mistakes": maxi(0, mistakes),
+		"region_state": state
 	}
 
 
@@ -660,6 +736,7 @@ func _default_save_data() -> Dictionary:
 		"next_region_event_unix": 0,
 		"completed_field_action_ids": [],
 		"next_field_action_unix": 0,
+		"region_progress": {},
 		"tutorial_step": 0,
 		"play_time_seconds": 0.0,
 		"total_trips": 0,
@@ -702,6 +779,7 @@ func _apply_save_data(data: Dictionary) -> void:
 		0,
 		_dictionary_int(data, "next_field_action_unix", 0)
 	)
+	region_progress = _dictionary_dictionary(data, "region_progress").duplicate(true)
 	tutorial_step = clampi(_dictionary_int(data, "tutorial_step", 0), 0, 4)
 	play_time_seconds = maxf(0.0, _dictionary_float(data, "play_time_seconds", 0.0))
 	total_trips = maxi(0, _dictionary_int(data, "total_trips", 0))
@@ -725,6 +803,7 @@ func _build_save_data() -> Dictionary:
 		"next_region_event_unix": next_region_event_unix,
 		"completed_field_action_ids": completed_field_action_ids.duplicate(),
 		"next_field_action_unix": next_field_action_unix,
+		"region_progress": region_progress.duplicate(true),
 		"tutorial_step": tutorial_step,
 		"play_time_seconds": play_time_seconds,
 		"total_trips": total_trips,
@@ -775,6 +854,23 @@ func _rebuild_unlocked_stage_ids() -> void:
 		var stage_id: String = _dictionary_string(stages[index], "id", "")
 		if not stage_id.is_empty():
 			unlocked_stage_ids.append(stage_id)
+
+
+func _reconcile_region_progress() -> void:
+	for stage: Dictionary in stages:
+		var stage_id: String = _dictionary_string(stage, "id", "")
+		if stage_id.is_empty():
+			continue
+		var state: Dictionary = get_region_state(stage_id)
+		if state.is_empty():
+			state = {
+				"action_level": 0,
+				"risk_level": 2,
+				"route_unlocked": false,
+				"flags": [],
+				"last_choice_id": ""
+			}
+		region_progress[stage_id] = state
 
 
 func _load_build_info() -> void:
@@ -830,6 +926,13 @@ func _dictionary_string(data: Dictionary, key: String, fallback: String) -> Stri
 	if value is StringName:
 		@warning_ignore("unsafe_call_argument")
 		return String(value)
+	return fallback
+
+
+func _dictionary_bool(data: Dictionary, key: String, fallback: bool) -> bool:
+	var value: Variant = data.get(key, fallback)
+	if value is bool:
+		return value
 	return fallback
 
 

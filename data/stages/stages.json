@@ -17,7 +17,8 @@
       "choices": [
         {"label": "숨은 통로로 우회", "result": "안전한 벽 틈으로 치즈를 넉넉히 옮겼습니다.", "effect": "secure", "reward_trips": 2},
         {"label": "순찰 전에 질주", "result": "짧은 틈을 노려 치즈를 싣고 빠르게 돌아왔습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
-      ]
+      ],
+      "expert_choice": {"id": "thread_route_team", "label": "실 통로 원정대 투입", "result": "실 통로를 이용해 고양이 눈을 피해 치즈를 회수했습니다.", "effect": "expert", "reward_trips": 3, "risk_delta": -1, "requires_action_level": 3}
     },
     "field_action": {
       "id": "kitchen_thread_tangle",
@@ -25,7 +26,8 @@
       "title": "실타래 속 비밀길",
       "description": "바느질 바구니에서 흘러나온 실이 통로를 막았습니다. 연결된 매듭을 따라 실을 풀어 길을 여세요.",
       "reward_trips": 3,
-      "first_completion_reward_trips": 2
+      "first_completion_reward_trips": 2,
+      "result_flag": "thread_route"
     },
     "background_color": "#352a3b"
   },
@@ -47,7 +49,8 @@
       "choices": [
         {"label": "끈을 풀어 안전 확보", "result": "해체조가 통로를 열고 곡물을 안전하게 회수했습니다.", "effect": "secure", "reward_trips": 2},
         {"label": "상자 위로 빠르게 통과", "result": "높은 길을 달려 경계 구역을 벗어났습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
-      ]
+      ],
+      "expert_choice": {"id": "tower_trap_team", "label": "철탑 해체조 지휘", "result": "높은 우회로에서 쥐덫 장치를 안전하게 해체했습니다.", "effect": "expert", "reward_trips": 3, "risk_delta": -1, "requires_action_level": 3}
     },
     "field_action": {
       "id": "storage_shelf_tower",
@@ -55,7 +58,8 @@
       "title": "선반 철탑 오르기",
       "description": "곡물 자루 위의 높은 선반에 안전 표식이 있습니다. 빛나는 발판을 밟아 꼭대기까지 올라가세요.",
       "reward_trips": 3,
-      "first_completion_reward_trips": 2
+      "first_completion_reward_trips": 2,
+      "result_flag": "high_route"
     },
     "background_color": "#26394a"
   },
@@ -77,7 +81,8 @@
       "choices": [
         {"label": "계산대 아래에서 대기", "result": "소리가 멎은 뒤 남은 과자를 안전하게 모았습니다.", "effect": "secure", "reward_trips": 2},
         {"label": "폐기 봉투를 먼저 선점", "result": "원정대가 봉투를 낚아채 빠른 귀환로를 열었습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
-      ]
+      ],
+      "expert_choice": {"id": "mapped_night_run", "label": "완성한 통로 지도로 지휘", "result": "청소 동선을 예측해 과자 봉투를 연속으로 확보했습니다.", "effect": "expert", "reward_trips": 3, "risk_delta": -1, "requires_action_level": 3}
     },
     "field_action": {
       "id": "store_infinite_aisle",
@@ -85,7 +90,8 @@
       "title": "무한 진열 통로",
       "description": "거울과 냉장고 불빛이 끝없는 통로를 만들었습니다. 중앙 신호와 같은 색의 문을 찾아 빠져나오세요.",
       "reward_trips": 3,
-      "first_completion_reward_trips": 2
+      "first_completion_reward_trips": 2,
+      "result_flag": "aisle_map"
     },
     "background_color": "#243f39"
   },
@@ -107,7 +113,17 @@
       "choices": [
         {"label": "배수관 길로 우회", "result": "서늘한 통로에서 고급 치즈를 안전하게 운반했습니다.", "effect": "secure", "reward_trips": 2},
         {"label": "열기가 약할 때 돌파", "result": "운반조가 순간을 노려 바구니를 빠르게 비웠습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
-      ]
+      ],
+      "expert_choice": {"id": "drain_route_feast", "label": "배수관 전문 원정", "result": "서늘한 배수관으로 고급 식량을 대량 회수했습니다.", "effect": "expert", "reward_trips": 4, "risk_delta": -1, "requires_action_level": 3}
+    },
+    "field_action": {
+      "id": "restaurant_heat_passage",
+      "type": "timing",
+      "title": "화로 사이 통과",
+      "description": "열기 파동이 약해지는 순간을 읽고 안전 구간을 다섯 번 통과하세요.",
+      "reward_trips": 3,
+      "first_completion_reward_trips": 2,
+      "result_flag": "drain_route"
     },
     "background_color": "#4a302c"
   },
@@ -129,7 +145,17 @@
       "choices": [
         {"label": "정지 손잡이를 찾아 확보", "result": "기술쥐가 기계를 멈추고 치즈를 안정적으로 회수했습니다.", "effect": "secure", "reward_trips": 2},
         {"label": "벨트 위에서 바로 운반", "result": "운반조가 벨트 속도를 이용해 빠르게 귀환했습니다.", "effect": "rush", "reward_trips": 1, "boost_seconds": 8.0}
-      ]
+      ],
+      "expert_choice": {"id": "controlled_conveyor", "label": "제어 운반선 가동", "result": "분기 장치를 제어해 숙성 치즈가 굴 방향으로 이동했습니다.", "effect": "expert", "reward_trips": 4, "risk_delta": -1, "requires_action_level": 3}
+    },
+    "field_action": {
+      "id": "factory_conveyor_route",
+      "type": "route",
+      "title": "컨베이어 전환",
+      "description": "분기점의 빛나는 방향을 눌러 치즈 운반선을 안전 출구로 연결하세요.",
+      "reward_trips": 3,
+      "first_completion_reward_trips": 2,
+      "result_flag": "conveyor_control"
     },
     "background_color": "#4b4025"
   }

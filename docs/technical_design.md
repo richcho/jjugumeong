@@ -59,7 +59,7 @@ GatheringMouse 귀환
 | 주 파일 | `user://savegame.json` |
 | 백업 | `user://savegame.backup.json` |
 | 임시 파일 | `user://savegame.tmp.json` |
-| 현재 스키마 | 3 |
+| 현재 스키마 | 4 |
 
 저장 순서:
 
@@ -94,6 +94,10 @@ Web에서는 `user://`의 IndexedDB 저장, `localStorage`, 소형 쿠키 백업
 스키마 2 이하 저장은 완료한 현장 행동 없음, 대기 시간 0으로 이관합니다. 입력
 진행은 일시적인 UI 상태이며 행동을 끝낸 뒤 `GameManager`가 보상과 완료 ID를
 함께 저장합니다.
+
+스키마 4는 지역 ID별 `region_progress`를 추가합니다. 각 상태는 행동 숙련도,
+위험도, 안전 경로, 지역 표식과 마지막 선택을 가지며 스키마 3 이하 저장은
+기본 위험도 2와 미개방 경로로 이관합니다.
 
 ## 5. 화면과 반응형 규칙
 

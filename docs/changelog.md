@@ -16,5 +16,5 @@
 
 | 날짜 | 상세 | 유형 | 요약 | 상태 |
 | --- | --- | --- | --- | --- |
-| 2026-07-19 | [상세](changelog/20260719.md) | feat/fix/refactor/test/docs | V0.3.2 점 기반 현장 행동·직접 입력·스키마 3 | 유지 |
+| 2026-07-19 | [상세](changelog/20260719.md) | feat/fix/refactor/test/docs | V0.3.3 다섯 지역 행동·지속 결과·스키마 4 | 유지 |
 | 2026-07-18 | [상세](changelog/20260718.md) | feat/fix/docs | V0.1 수직 슬라이스, iPad PWA, 한글 폰트, Safari 화면 보정, 프로젝트 문서 체계 정리 | 유지 |

@@ -69,6 +69,10 @@ func get_status_text() -> String:
 				total_steps,
 				mistakes
 			]
+		"timing":
+			return "열기 고리가 안쪽 안전선에 들어올 때 중앙을 누르세요 · %d/%d · 실수 %d" % [step, total_steps, mistakes]
+		"route":
+			return "빛나는 분기점을 순서대로 연결하세요 · %d/%d · 실수 %d" % [step, total_steps, mistakes]
 	return "행동 데이터가 준비되지 않았습니다."
 
 
@@ -80,6 +84,10 @@ func get_total_steps() -> int:
 			return 7
 		"infinite":
 			return 5
+		"timing":
+			return 5
+		"route":
+			return 6
 	return 0
 
 
@@ -101,6 +109,12 @@ func get_active_target_position() -> Vector2:
 		for portal_index: int in range(portals.size()):
 			if _portal_color_index(portal_index) == target_color_index:
 				return portals[portal_index]
+	elif action_type == "timing":
+		return size * 0.5
+	elif action_type == "route":
+		var route_points: PackedVector2Array = _route_points()
+		if step < route_points.size():
+			return route_points[step]
 	return Vector2.ZERO
 
 
@@ -110,6 +124,8 @@ func submit_point(local_point: Vector2) -> bool:
 	var target: Vector2 = get_active_target_position()
 	var hit_radius: float = 48.0 if action_type == "infinite" else 34.0
 	var correct: bool = local_point.distance_to(target) <= hit_radius
+	if action_type == "timing":
+		correct = correct and absf(sin(elapsed * 2.5)) <= 0.32
 	if correct:
 		step += 1
 		if step >= get_total_steps():
@@ -152,6 +168,10 @@ func _draw() -> void:
 			_draw_tower()
 		"infinite":
 			_draw_infinite()
+		"timing":
+			_draw_timing()
+		"route":
+			_draw_route()
 		_:
 			draw_circle(size * 0.5, 8.0, Color("#8b8298"))
 
@@ -272,6 +292,31 @@ func _draw_explorer(point: Vector2) -> void:
 	draw_arc(point, 11.0, 0.0, TAU, 18, Color(1.0, 0.85, 0.4, 0.4), 2.0, true)
 
 
+func _draw_timing() -> void:
+	var center: Vector2 = size * 0.5
+	var heat_radius: float = 32.0 + absf(sin(elapsed * 2.5)) * 105.0
+	draw_arc(center, 42.0, 0.0, TAU, 40, Color("#73d7ff"), 3.0, true)
+	draw_arc(center, heat_radius, 0.0, TAU, 48, Color("#ff765f"), 8.0, true)
+	draw_circle(center, 12.0, Color("#fff7e0"))
+
+
+func _draw_route() -> void:
+	var points: PackedVector2Array = _route_points()
+	for index: int in range(points.size() - 1):
+		draw_line(points[index], points[index + 1], Color(0.35, 0.48, 0.55, 0.55), 4.0, true)
+	for index: int in range(points.size()):
+		var color: Color = Color("#59636b")
+		var radius: float = 11.0
+		if index < step:
+			color = Color("#94e0b5")
+		elif index == step and not finished:
+			color = Color("#ffd969")
+			radius = 15.0 + sin(elapsed * 5.0) * 2.0
+		draw_circle(points[index], radius, color)
+	if not points.is_empty():
+		_draw_explorer(points[clampi(step - 1, 0, points.size() - 1)])
+
+
 func _untangle_points() -> PackedVector2Array:
 	return PackedVector2Array([
 		Vector2(size.x * 0.16, size.y * 0.68),
@@ -301,6 +346,17 @@ func _portal_points() -> PackedVector2Array:
 		Vector2(size.x * 0.18, size.y * 0.5),
 		Vector2(size.x * 0.5, size.y * 0.2),
 		Vector2(size.x * 0.82, size.y * 0.5)
+	])
+
+
+func _route_points() -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(size.x * 0.12, size.y * 0.72),
+		Vector2(size.x * 0.28, size.y * 0.32),
+		Vector2(size.x * 0.43, size.y * 0.67),
+		Vector2(size.x * 0.58, size.y * 0.25),
+		Vector2(size.x * 0.73, size.y * 0.62),
+		Vector2(size.x * 0.9, size.y * 0.35)
 	])
 
 

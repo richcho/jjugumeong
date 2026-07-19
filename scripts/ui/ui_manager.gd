@@ -337,7 +337,7 @@ func _build_region_event_panel() -> void:
 	region_event_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	region_event_description.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(region_event_description)
-	for choice_index: int in range(2):
+	for choice_index: int in range(3):
 		var choice_button: Button = _make_button(
 			"",
 			_resolve_region_event.bind(choice_index),
@@ -707,9 +707,11 @@ func _show_regions() -> void:
 		var action_title: String = _dictionary_string(entry, "action_title", "")
 		var action_text: String = ""
 		if not action_title.is_empty():
-			action_text = " · 행동 %s" % (
-				"완료" if _dictionary_bool(entry, "action_completed", false) else "미완료"
-			)
+			action_text = " · 행동 Lv.%d / 위험 %d%s" % [
+				_dictionary_int(entry, "action_level", 0),
+				_dictionary_int(entry, "risk_level", 2),
+				" / 길 개방" if _dictionary_bool(entry, "route_unlocked", false) else ""
+			]
 		var button: Button = _make_button(
 			"%s%s · 자원 %s / 위험 %s\n%s%s" % [
 				"[현재] " if current else "",
@@ -758,17 +760,30 @@ func _show_region_event() -> void:
 		return
 	@warning_ignore("unsafe_cast")
 	var choices: Array = choices_value as Array
-	if choices.size() != 2:
+	if choices.size() < 2 or choices.size() > region_choice_buttons.size():
 		return
-	for index: int in range(2):
+	for button: Button in region_choice_buttons:
+		button.hide()
+	for index: int in range(choices.size()):
 		var choice_value: Variant = choices[index]
 		if choice_value is Dictionary:
 			@warning_ignore("unsafe_cast")
-			region_choice_buttons[index].text = _dictionary_string(
-				choice_value as Dictionary,
-				"label",
-				"선택"
-			)
+			var choice: Dictionary = choice_value as Dictionary
+			var locked: bool = _dictionary_bool(choice, "locked", false)
+			region_choice_buttons[index].text = "%s%s" % [
+				_dictionary_string(
+					choice,
+					"label",
+					"선택"
+				),
+				"\n🔒 %s" % _dictionary_string(
+					choice,
+					"lock_reason",
+					"조건 부족"
+				) if locked else ""
+			]
+			region_choice_buttons[index].disabled = locked
+			region_choice_buttons[index].show()
 	region_event_panel.show()
 	region_event_panel.move_to_front()
 
@@ -829,10 +844,12 @@ func _resolve_field_action(action_id: String, mistakes: int) -> void:
 		field_action_status.text = "완료 기록 실패 · 잠시 뒤 다시 시도하세요."
 		return
 	var first_completion: bool = _dictionary_bool(result, "first_completion", false)
-	field_action_status.text = "%s완료 · 실수 %d회 · 치즈 +%s" % [
+	var region_state: Dictionary = _dictionary_dictionary(result, "region_state")
+	field_action_status.text = "%s완료 · 치즈 +%s\n안전 경로 개방 · 숙련 Lv.%d · 위험 %d" % [
 		"첫 발견! " if first_completion else "",
-		_dictionary_int(result, "mistakes", 0),
-		_format_number(_dictionary_float(result, "reward", 0.0))
+		_format_number(_dictionary_float(result, "reward", 0.0)),
+		_dictionary_int(region_state, "action_level", 0),
+		_dictionary_int(region_state, "risk_level", 0)
 	]
 	_show_toast(
 		"%s 완료 · 치즈 +%s" % [
@@ -972,3 +989,11 @@ func _dictionary_bool(data: Dictionary, key: String, fallback: bool) -> bool:
 	if value is bool:
 		return value
 	return fallback
+
+
+func _dictionary_dictionary(data: Dictionary, key: String) -> Dictionary:
+	var value: Variant = data.get(key, {})
+	if value is Dictionary:
+		@warning_ignore("unsafe_cast")
+		return value as Dictionary
+	return {}
