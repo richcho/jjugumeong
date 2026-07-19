@@ -39,16 +39,17 @@ func _run_tests() -> void:
 	_test_background_anchor_alignment()
 	_test_perspective_route()
 	_test_mouse_sprites()
+	_test_living_mouse_behavior()
 	_test_korean_font()
 	_test_save_round_trip()
 	await _test_ui_layout()
 	await _test_mouse_round_trip()
 
 	if _failures == 0:
-		print("JJUGUMEONG V0.4.4 tests: PASS")
+		print("JJUGUMEONG V0.4.5 tests: PASS")
 		get_tree().quit(0)
 	else:
-		push_error("JJUGUMEONG V0.4.4 tests: %d failure(s)" % _failures)
+		push_error("JJUGUMEONG V0.4.5 tests: %d failure(s)" % _failures)
 		get_tree().quit(1)
 
 
@@ -61,9 +62,9 @@ func _test_time_cap() -> void:
 func _test_build_info() -> void:
 	_expect_true(GameManager.display_name == "쥐구멍", "build display name")
 	_expect_true(GameManager.product_name == "r4", "build product name")
-	_expect_true(GameManager.build_version == "0.4.4", "build version")
+	_expect_true(GameManager.build_version == "0.4.5", "build version")
 	_expect_true(GameManager.build_phase == "V0.4 Alpha", "build phase")
-	_expect_true(GameManager.get_build_label() == "r4 0.4.4", "build label")
+	_expect_true(GameManager.get_build_label() == "r4 0.4.5", "build label")
 
 
 func _test_save_schema_migration() -> void:
@@ -1477,6 +1478,88 @@ func _test_mouse_sprites() -> void:
 	]:
 		var mouse_texture: Texture2D = load(path) as Texture2D
 		_expect_true(mouse_texture != null, "mouse sprite loads: %s" % path)
+
+
+func _test_living_mouse_behavior() -> void:
+	var mouse_scene: PackedScene = load(
+		"res://scenes/mouse/mouse.tscn"
+	) as PackedScene
+	_expect_true(mouse_scene != null, "living mouse scene loads")
+	if mouse_scene == null:
+		return
+	var route: PackedVector2Array = PackedVector2Array([
+		Vector2.ZERO,
+		Vector2(500.0, -30.0),
+		Vector2(1000.0, 0.0)
+	])
+	var mouse_node: GatheringMouse = mouse_scene.instantiate() as GatheringMouse
+	_expect_true(mouse_node != null, "living mouse instantiates")
+	if mouse_node == null:
+		return
+	mouse_node.configure_route(route, 0.0, 0, 0.35, 1)
+	mouse_node._observation_timer = 0.0
+	mouse_node._process_perspective_route(0.016)
+	_expect_true(
+		mouse_node.get_activity_state_name() == "sniffing",
+		"mouse enters sniffing observation"
+	)
+	mouse_node._process_activity(0.8)
+	_expect_true(
+		mouse_node.get_activity_state_name() == "traveling",
+		"mouse resumes travel after sniffing"
+	)
+	mouse_node._observation_timer = 999.0
+	mouse_node.current_speed = 0.0
+	var progress_before: float = mouse_node.route_progress
+	mouse_node._process_perspective_route(0.1)
+	_expect_true(mouse_node.current_speed > 0.0, "mouse accelerates from rest")
+	_expect_true(
+		mouse_node.route_progress > progress_before,
+		"accelerating mouse advances route"
+	)
+	mouse_node.carrying = false
+	var light_target_speed: float = mouse_node._get_target_speed()
+	mouse_node.carrying = true
+	var carrying_target_speed: float = mouse_node._get_target_speed()
+	_expect_true(
+		carrying_target_speed < light_target_speed,
+		"carrying weight lowers mouse target speed"
+	)
+	mouse_node.carrying = false
+	mouse_node.outbound = true
+	mouse_node.route_progress = 0.999
+	mouse_node.current_speed = GameManager.get_move_speed()
+	mouse_node._facing_sign = 1.0
+	mouse_node._process_perspective_route(0.1)
+	_expect_true(
+		mouse_node.get_activity_state_name() == "loading",
+		"mouse enters loading at resource"
+	)
+	_expect_true(not mouse_node.outbound, "mouse turns home after loading")
+	_expect_true(
+		mouse_node._facing_sign > -1.0,
+		"mouse direction does not flip in one frame"
+	)
+	mouse_node.walk_phase = PI * 0.5
+	mouse_node.current_speed = GameManager.get_move_speed()
+	mouse_node._tail_angle = 0.0
+	mouse_node._update_tail_motion(0.2)
+	_expect_true(
+		not is_zero_approx(mouse_node._tail_angle),
+		"mouse tail follows movement with delay"
+	)
+
+	var second_mouse: GatheringMouse = mouse_scene.instantiate() as GatheringMouse
+	second_mouse.configure_route(route, 0.0, 1, 0.35, 1)
+	_expect_true(
+		not is_equal_approx(
+			mouse_node._observation_timer,
+			second_mouse._observation_timer
+		),
+		"mice use different observation timing"
+	)
+	mouse_node.free()
+	second_mouse.free()
 
 
 func _test_background_anchor_alignment() -> void:

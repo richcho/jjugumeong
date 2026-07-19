@@ -24,6 +24,9 @@
 | 자동 저장 | 3초 | `AUTO_SAVE_INTERVAL` |
 | 오프라인 상한 | 4시간 | `TimeManager` |
 | 예상 편도 거리 | 760 px | `ESTIMATED_ONE_WAY_DISTANCE` |
+| 쥐 행동 이동 보정 | 이동 구간 1.12배 | `MOVING_SPEED_COMPENSATION` |
+| 치즈 운반 속도 | 보정 이동속도의 82% | `CARRYING_SPEED_MULTIPLIER` |
+| 쥐 탐색 정지 | 경로 중간 0.45~0.69초 | `GatheringMouse` |
 | 보육실 해금 | 쥐구멍 Lv.10 | `NURSERY_UNLOCK_HOLE_LEVEL` |
 | 보육실 건설 비용 | 500 | `NURSERY_BUILD_COST` |
 | 새끼 등록 시작 비용 | 200, 완료마다 1.5배 | `get_nursery_pup_cost()` |
