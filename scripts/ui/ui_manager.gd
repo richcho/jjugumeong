@@ -82,7 +82,7 @@ func _ready() -> void:
 	_connect_events()
 	_update_responsive_layout()
 	_refresh_all()
-	save_label.text = "저장 복구됨" if SaveManager.last_load_was_recovered else "불러오기 완료"
+	save_label.text = SaveManager.get_last_load_summary()
 	if GameManager.tutorial_step < 4:
 		_show_tutorial()
 	if GameManager.offline_reward > 0.0:
@@ -1355,7 +1355,7 @@ func _hide_offline_reward() -> void:
 
 func _save_manually() -> void:
 	if GameManager.save_now():
-		_show_toast("저장됨")
+		_show_toast(SaveManager.get_last_save_summary())
 	else:
 		_show_toast("저장 실패 · Safari 설정 확인 필요")
 

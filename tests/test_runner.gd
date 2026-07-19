@@ -11,6 +11,7 @@ func _run_tests() -> void:
 	_test_time_cap()
 	_test_build_info()
 	_test_save_schema_migration()
+	_test_save_revision_ordering()
 	_test_upgrade_costs()
 	_test_natural_speed_curve()
 	_test_visual_progression()
@@ -44,10 +45,10 @@ func _run_tests() -> void:
 	await _test_mouse_round_trip()
 
 	if _failures == 0:
-		print("JJUGUMEONG V0.4.3 tests: PASS")
+		print("JJUGUMEONG V0.4.4 tests: PASS")
 		get_tree().quit(0)
 	else:
-		push_error("JJUGUMEONG V0.4.3 tests: %d failure(s)" % _failures)
+		push_error("JJUGUMEONG V0.4.4 tests: %d failure(s)" % _failures)
 		get_tree().quit(1)
 
 
@@ -60,9 +61,9 @@ func _test_time_cap() -> void:
 func _test_build_info() -> void:
 	_expect_true(GameManager.display_name == "쥐구멍", "build display name")
 	_expect_true(GameManager.product_name == "r4", "build product name")
-	_expect_true(GameManager.build_version == "0.4.3", "build version")
+	_expect_true(GameManager.build_version == "0.4.4", "build version")
 	_expect_true(GameManager.build_phase == "V0.4 Alpha", "build phase")
-	_expect_true(GameManager.get_build_label() == "r4 0.4.3", "build label")
+	_expect_true(GameManager.get_build_label() == "r4 0.4.4", "build label")
 
 
 func _test_save_schema_migration() -> void:
@@ -74,6 +75,7 @@ func _test_save_schema_migration() -> void:
 	}
 	var defaults: Dictionary = {
 		"schema_version": SaveManager.CURRENT_SCHEMA_VERSION,
+		"save_revision": 0,
 		"cheese": 0.0,
 		"total_cheese": 0.0,
 		"selected_stage_index": 0,
@@ -103,7 +105,7 @@ func _test_save_schema_migration() -> void:
 		var migrated: Dictionary = migrated_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(migrated, "schema_version", 0),
-			8,
+			9,
 			"schema migration version"
 		)
 		_expect_equal_int(
@@ -138,7 +140,7 @@ func _test_save_schema_migration() -> void:
 		var schema_two_migrated: Dictionary = schema_two_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(schema_two_migrated, "schema_version", 0),
-			8,
+			9,
 			"schema 2 migration version"
 		)
 		_expect_equal_int(
@@ -171,7 +173,7 @@ func _test_save_schema_migration() -> void:
 		var schema_four_migrated: Dictionary = schema_four_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(schema_four_migrated, "schema_version", 0),
-			8,
+			9,
 			"schema 4 migration version"
 		)
 		_expect_equal_int(
@@ -246,7 +248,7 @@ func _test_save_schema_migration() -> void:
 		var schema_seven_migrated: Dictionary = schema_seven_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(schema_seven_migrated, "schema_version", 0),
-			8,
+			9,
 			"schema 7 migration version"
 		)
 		_expect_true(
@@ -264,6 +266,79 @@ func _test_save_schema_migration() -> void:
 			0,
 			"schema 7 hero mission cooldown initialized"
 		)
+	var schema_eight: Dictionary = {
+		"schema_version": 8,
+		"selected_hero_id": "boreum",
+		"hero_bond_level": 2,
+		"next_hero_mission_unix": 1234
+	}
+	var schema_eight_value: Variant = SaveManager.call(
+		"_migrate_data",
+		schema_eight,
+		defaults
+	)
+	_expect_true(schema_eight_value is Dictionary, "schema 8 migration result type")
+	if schema_eight_value is Dictionary:
+		@warning_ignore("unsafe_cast")
+		var schema_eight_migrated: Dictionary = schema_eight_value as Dictionary
+		_expect_equal_int(
+			_dictionary_int(schema_eight_migrated, "schema_version", 0),
+			9,
+			"schema 8 migration version"
+		)
+		_expect_equal_int(
+			_dictionary_int(schema_eight_migrated, "save_revision", -1),
+			0,
+			"schema 8 save revision initialized"
+		)
+		_expect_equal_int(
+			_dictionary_int(schema_eight_migrated, "hero_bond_level", 0),
+			2,
+			"schema 8 hero bond preserved"
+		)
+
+
+func _test_save_revision_ordering() -> void:
+	var current: Dictionary = {
+		"save_revision": 4,
+		"last_saved_unix": 100
+	}
+	var newer_revision: Dictionary = {
+		"save_revision": 5,
+		"last_saved_unix": 90
+	}
+	var older_revision: Dictionary = {
+		"save_revision": 3,
+		"last_saved_unix": 200
+	}
+	var same_revision_newer_time: Dictionary = {
+		"save_revision": 4,
+		"last_saved_unix": 101
+	}
+	_expect_true(
+		_call_is_newer_save(newer_revision, current),
+		"save revision wins over timestamp"
+	)
+	_expect_true(
+		not _call_is_newer_save(older_revision, current),
+		"older save revision rejected"
+	)
+	_expect_true(
+		_call_is_newer_save(same_revision_newer_time, current),
+		"save timestamp breaks equal revision"
+	)
+	_expect_true(
+		_call_is_newer_save(
+			{"last_saved_unix": 101},
+			{"last_saved_unix": 100}
+		),
+		"legacy save timestamp ordering"
+	)
+
+
+func _call_is_newer_save(candidate: Dictionary, current: Dictionary) -> bool:
+	var result: Variant = SaveManager.call("_is_newer_save", candidate, current)
+	return result is bool and result
 
 
 func _test_nursery_lifecycle() -> void:
@@ -1473,6 +1548,7 @@ func _test_perspective_route() -> void:
 func _test_save_round_trip() -> void:
 	var payload: Dictionary = {
 		"schema_version": SaveManager.CURRENT_SCHEMA_VERSION,
+		"save_revision": 0,
 		"cheese": 321.0,
 		"total_cheese": 654.0,
 		"mouse_count": 4,
@@ -1554,6 +1630,10 @@ func _test_save_round_trip() -> void:
 		_dictionary_int(loaded, "next_hero_mission_unix", 0)
 		> TimeManager.current_unix_time(),
 		"save/load hero mission cooldown"
+	)
+	_expect_true(
+		_dictionary_int(loaded, "save_revision", 0) > 0,
+		"save/load revision"
 	)
 
 

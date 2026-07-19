@@ -97,10 +97,7 @@ func _ready() -> void:
 	_next_golden_event = randf_range(GOLDEN_EVENT_MIN_DELAY, GOLDEN_EVENT_MAX_DELAY)
 	_is_ready = true
 	save_now()
-	if SaveManager.last_load_was_recovered:
-		EventBus.save_status_changed.emit("저장 복구됨")
-	else:
-		EventBus.save_status_changed.emit("불러오기 완료")
+	EventBus.save_status_changed.emit(SaveManager.get_last_load_summary())
 
 
 func _process(delta: float) -> void:
@@ -569,9 +566,9 @@ func save_now() -> bool:
 	var success: bool = SaveManager.save_game(_build_save_data())
 	if success:
 		if SaveManager.last_save_was_persistent:
-			EventBus.save_status_changed.emit("저장됨")
+			EventBus.save_status_changed.emit(SaveManager.get_last_save_summary())
 		else:
-			EventBus.save_status_changed.emit("Safari 저장 제한")
+			EventBus.save_status_changed.emit("브라우저 저장 제한")
 	else:
 		EventBus.save_status_changed.emit("저장 실패")
 	return success
@@ -1123,6 +1120,7 @@ var _loaded_last_saved_unix: int = 0
 func _default_save_data() -> Dictionary:
 	return {
 		"schema_version": SaveManager.CURRENT_SCHEMA_VERSION,
+		"save_revision": 0,
 		"cheese": 0.0,
 		"total_cheese": 0.0,
 		"mouse_count": 1,
