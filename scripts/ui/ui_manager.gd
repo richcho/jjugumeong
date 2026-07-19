@@ -49,6 +49,12 @@ var field_action_description: Label
 var field_action_status: Label
 var field_action_view: DotActionView
 var field_action_button: Button
+var nursery_panel: PanelContainer
+var nursery_summary: Label
+var nursery_view: NurseryView
+var nursery_primary_button: Button
+var nursery_claim_button: Button
+var nursery_button: Button
 
 var _toast_remaining: float = 0.0
 var _refresh_elapsed: float = 0.0
@@ -195,6 +201,8 @@ func _build_interface() -> void:
 	utility_row.add_child(region_event_button)
 	field_action_button = _make_utility_button("현장 행동", _show_field_action)
 	utility_row.add_child(field_action_button)
+	nursery_button = _make_utility_button("보육실", _show_nursery)
+	utility_row.add_child(nursery_button)
 	utility_row.add_child(_make_utility_button("지금 저장", _save_manually))
 
 	toast_label = _make_label("", 20, Color("#fff4d4"))
@@ -213,6 +221,7 @@ func _build_interface() -> void:
 	_build_region_panel()
 	_build_region_event_panel()
 	_build_field_action_panel()
+	_build_nursery_panel()
 	_build_tutorial_panel()
 	_build_offline_panel()
 
@@ -382,6 +391,39 @@ func _build_field_action_panel() -> void:
 	content.add_child(_make_button("현장에서 나가기", _hide_field_action, Color("#5d486f")))
 
 
+func _build_nursery_panel() -> void:
+	nursery_panel = PanelContainer.new()
+	nursery_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.065, 0.04, 0.06, 0.99), 16)
+	)
+	nursery_panel.hide()
+	add_child(nursery_panel)
+	var margin: MarginContainer = _make_margin(18)
+	nursery_panel.add_child(margin)
+	var content: VBoxContainer = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	margin.add_child(content)
+	var heading: Label = _make_label("새끼쥐 보육실", 24, Color("#ffd969"))
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(heading)
+	nursery_summary = _make_label("", 14, Color("#f0e4e9"))
+	nursery_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nursery_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(nursery_summary)
+	nursery_view = NurseryView.new()
+	nursery_view.custom_minimum_size = Vector2(0.0, 250.0)
+	nursery_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nursery_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	nursery_view.pup_pressed.connect(_on_nursery_pup_pressed)
+	content.add_child(nursery_view)
+	nursery_primary_button = _make_button("", _on_nursery_primary_pressed, Color("#73525f"))
+	content.add_child(nursery_primary_button)
+	nursery_claim_button = _make_button("성체 합류", _on_nursery_claim_pressed, Color("#4e765f"))
+	content.add_child(nursery_claim_button)
+	content.add_child(_make_button("보육실 나가기", _hide_nursery, Color("#5d486f")))
+
+
 func _build_tutorial_panel() -> void:
 	tutorial_panel = PanelContainer.new()
 	tutorial_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.07, 0.055, 0.09, 0.98), 16))
@@ -493,6 +535,16 @@ func _refresh_all() -> void:
 			else "현장 행동 · 새 발견"
 		)
 		field_action_button.disabled = false
+	nursery_button.text = (
+		"보육실 %d/%d" % [
+			GameManager.nursery_pups.size(),
+			GameManager.get_nursery_capacity()
+		]
+		if GameManager.nursery_level > 0
+		else "보육실 · Lv.%d" % GameManager.NURSERY_UNLOCK_HOLE_LEVEL
+	)
+	if nursery_panel.visible:
+		_refresh_nursery_panel()
 
 	var reward: Dictionary = GameManager.get_next_reward_summary()
 	var reward_current: float = _dictionary_float(reward, "current", 0.0)
@@ -555,6 +607,7 @@ func _update_responsive_layout() -> void:
 	_place_modal(region_panel, Vector2(540.0, 500.0))
 	_place_modal(region_event_panel, Vector2(560.0, 390.0))
 	_place_modal(field_action_panel, Vector2(620.0, 620.0))
+	_place_modal(nursery_panel, Vector2(600.0, 620.0))
 	_place_modal(tutorial_panel, Vector2(480.0, 280.0))
 	_place_modal(offline_panel, Vector2(480.0, 260.0))
 	_place_modal(discovery_panel, Vector2(520.0, 150.0))
@@ -601,7 +654,7 @@ func _make_button(text_value: String, callback: Callable, color: Color) -> Butto
 
 func _make_utility_button(text_value: String, callback: Callable) -> Button:
 	var button: Button = _make_button(text_value, callback, Color(0.14, 0.16, 0.2, 0.92))
-	button.custom_minimum_size = Vector2(110.0, 28.0)
+	button.custom_minimum_size = Vector2(90.0, 28.0)
 	button.add_theme_font_size_override("font_size", 12)
 	return button
 
@@ -667,6 +720,7 @@ func _show_stats() -> void:
 		+ "황금치즈 사건: %d회\n"
 		+ "발견한 지역 사건: %d개\n"
 		+ "완료한 현장 행동: %d개\n"
+		+ "보육실 출신 성체: %d마리\n"
 		+ "현재 생산 보너스: %.2f배"
 	) % [
 		_format_number(GameManager.total_cheese),
@@ -676,6 +730,7 @@ func _show_stats() -> void:
 		GameManager.total_golden_events,
 		GameManager.completed_region_event_ids.size(),
 		GameManager.completed_field_action_ids.size(),
+		GameManager.total_raised_pups,
 		GameManager.get_stage_bonus()
 	]
 	stats_panel.show()
@@ -832,6 +887,98 @@ func _show_field_action() -> void:
 
 func _hide_field_action() -> void:
 	field_action_panel.hide()
+
+
+func _show_nursery() -> void:
+	_refresh_nursery_panel()
+	nursery_panel.show()
+	nursery_panel.move_to_front()
+
+
+func _hide_nursery() -> void:
+	nursery_panel.hide()
+
+
+func _refresh_nursery_panel() -> void:
+	var snapshots: Array[Dictionary] = GameManager.get_nursery_pup_snapshots()
+	nursery_view.set_pups(snapshots)
+	if GameManager.nursery_level <= 0:
+		nursery_summary.text = (
+			"쥐구멍 Lv.%d에서 해금 · 건설 비용 치즈 %s\n"
+			+ "건설 후 작은 점을 눌러 직접 돌봅니다."
+		) % [
+			GameManager.NURSERY_UNLOCK_HOLE_LEVEL,
+			_format_number(float(GameManager.get_nursery_build_cost()))
+		]
+		nursery_primary_button.text = "보육실 건설 · 치즈 %s" % _format_number(
+			float(GameManager.get_nursery_build_cost())
+		)
+		nursery_primary_button.disabled = (
+			not GameManager.is_nursery_unlocked()
+			or GameManager.cheese < float(GameManager.get_nursery_build_cost())
+		)
+		nursery_claim_button.disabled = true
+		return
+
+	var lines: PackedStringArray = []
+	for snapshot: Dictionary in snapshots:
+		var pup_id: int = _dictionary_int(snapshot, "id", 0)
+		var ready: bool = _dictionary_bool(snapshot, "ready", false)
+		var care_count: int = _dictionary_int(snapshot, "care_count", 0)
+		lines.append(
+			"새끼 점 %d · %s · 돌봄 %d/%d" % [
+				pup_id,
+				"성장 완료" if ready else TimeManager.format_duration(
+					_dictionary_int(snapshot, "remaining_seconds", 0)
+				),
+				care_count,
+				GameManager.NURSERY_MAX_CARE
+			]
+		)
+	if lines.is_empty():
+		lines.append("빈 보호 원이 새끼 점을 기다립니다.")
+	nursery_summary.text = (
+		"슬롯 %d/%d · 점을 누르면 성장 15초 단축\n%s"
+	) % [
+		snapshots.size(),
+		GameManager.get_nursery_capacity(),
+		"\n".join(lines)
+	]
+	nursery_primary_button.text = "새끼 보육 시작 · 치즈 %s" % _format_number(
+		float(GameManager.get_nursery_pup_cost())
+	)
+	nursery_primary_button.disabled = (
+		snapshots.size() >= GameManager.get_nursery_capacity()
+		or GameManager.cheese < float(GameManager.get_nursery_pup_cost())
+	)
+	nursery_claim_button.disabled = _first_ready_pup_id(snapshots) <= 0
+
+
+func _on_nursery_primary_pressed() -> void:
+	if GameManager.nursery_level <= 0:
+		GameManager.build_nursery()
+	else:
+		GameManager.start_nursery_pup()
+	_refresh_nursery_panel()
+
+
+func _on_nursery_pup_pressed(pup_id: int) -> void:
+	GameManager.care_for_pup(pup_id)
+	_refresh_nursery_panel()
+
+
+func _on_nursery_claim_pressed() -> void:
+	var pup_id: int = _first_ready_pup_id(GameManager.get_nursery_pup_snapshots())
+	if pup_id > 0:
+		GameManager.claim_grown_pup(pup_id)
+	_refresh_nursery_panel()
+
+
+func _first_ready_pup_id(snapshots: Array[Dictionary]) -> int:
+	for snapshot: Dictionary in snapshots:
+		if _dictionary_bool(snapshot, "ready", false):
+			return _dictionary_int(snapshot, "id", 0)
+	return 0
 
 
 func _on_field_action_status_changed(status_text: String) -> void:

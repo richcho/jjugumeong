@@ -6,7 +6,7 @@ const TEMP_PATH: String = "user://savegame.tmp.json"
 const WEB_STORAGE_KEY: String = "jjugumeong.save.v1"
 const WEB_COOKIE_KEY: String = "jjugumeong_save"
 const WEB_COOKIE_MAX_SIZE: int = 2500
-const CURRENT_SCHEMA_VERSION: int = 4
+const CURRENT_SCHEMA_VERSION: int = 5
 
 var last_load_used_backup: bool = false
 var last_load_was_recovered: bool = false
@@ -214,6 +214,11 @@ func _migrate_data(data: Dictionary, default_data: Dictionary) -> Dictionary:
 		result["next_field_action_unix"] = 0
 	if schema_version < 4:
 		result["region_progress"] = {}
+	if schema_version < 5:
+		result["nursery_level"] = 0
+		result["nursery_pups"] = []
+		result["total_raised_pups"] = 0
+		result["next_pup_id"] = 1
 	result["schema_version"] = CURRENT_SCHEMA_VERSION
 	return result
 

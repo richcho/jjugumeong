@@ -18,6 +18,13 @@ const GOLDEN_EVENT_MAX_DELAY: float = 65.0
 const ESTIMATED_ONE_WAY_DISTANCE: float = 760.0
 const REGION_EVENT_COOLDOWN_SECONDS: int = 30
 const FIELD_ACTION_COOLDOWN_SECONDS: int = 20
+const NURSERY_UNLOCK_HOLE_LEVEL: int = 10
+const NURSERY_BUILD_COST: int = 500
+const NURSERY_BASE_PUP_COST: int = 200
+const NURSERY_GROWTH_SECONDS: int = 120
+const NURSERY_CARE_REDUCTION_SECONDS: int = 15
+const NURSERY_MAX_CARE: int = 3
+const NURSERY_LEVEL_ONE_CAPACITY: int = 2
 
 var cheese: float = 0.0
 var total_cheese: float = 0.0
@@ -33,6 +40,10 @@ var next_region_event_unix: int = 0
 var completed_field_action_ids: Array[String] = []
 var next_field_action_unix: int = 0
 var region_progress: Dictionary = {}
+var nursery_level: int = 0
+var nursery_pups: Array[Dictionary] = []
+var total_raised_pups: int = 0
+var next_pup_id: int = 1
 var tutorial_step: int = 0
 var golden_remaining: float = 0.0
 var click_boost_remaining: float = 0.0
@@ -156,6 +167,123 @@ func expand_hole() -> bool:
 	EventBus.game_state_changed.emit()
 	save_now()
 	return true
+
+
+func is_nursery_unlocked() -> bool:
+	return hole_level >= NURSERY_UNLOCK_HOLE_LEVEL
+
+
+func get_nursery_capacity() -> int:
+	return NURSERY_LEVEL_ONE_CAPACITY if nursery_level > 0 else 0
+
+
+func get_nursery_build_cost() -> int:
+	return NURSERY_BUILD_COST
+
+
+func get_nursery_pup_cost() -> int:
+	return _scaled_cost(NURSERY_BASE_PUP_COST, total_raised_pups)
+
+
+func build_nursery() -> bool:
+	if nursery_level > 0:
+		EventBus.toast_requested.emit("보육실은 이미 운영 중입니다.")
+		return false
+	if not is_nursery_unlocked():
+		EventBus.toast_requested.emit(
+			"보육실은 쥐구멍 Lv.%d에 열립니다." % NURSERY_UNLOCK_HOLE_LEVEL
+		)
+		return false
+	if not _spend_cheese(get_nursery_build_cost()):
+		return false
+	nursery_level = 1
+	EventBus.toast_requested.emit("새끼쥐 보육실을 열었습니다!")
+	EventBus.game_state_changed.emit()
+	save_now()
+	return true
+
+
+func start_nursery_pup() -> bool:
+	if nursery_level <= 0:
+		EventBus.toast_requested.emit("보육실을 먼저 건설해야 합니다.")
+		return false
+	if nursery_pups.size() >= get_nursery_capacity():
+		EventBus.toast_requested.emit("보육실 슬롯이 가득 찼습니다.")
+		return false
+	if not _spend_cheese(get_nursery_pup_cost()):
+		return false
+	nursery_pups.append({
+		"id": next_pup_id,
+		"ready_unix": TimeManager.current_unix_time() + NURSERY_GROWTH_SECONDS,
+		"care_count": 0
+	})
+	next_pup_id += 1
+	EventBus.toast_requested.emit("작은 새끼 점이 보육실에 들어왔습니다.")
+	EventBus.game_state_changed.emit()
+	save_now()
+	return true
+
+
+func get_nursery_pup_snapshots() -> Array[Dictionary]:
+	var snapshots: Array[Dictionary] = []
+	var now: int = TimeManager.current_unix_time()
+	for pup: Dictionary in nursery_pups:
+		var snapshot: Dictionary = pup.duplicate(true)
+		var remaining: int = maxi(0, _dictionary_int(pup, "ready_unix", now) - now)
+		snapshot["remaining_seconds"] = remaining
+		snapshot["ready"] = remaining <= 0
+		snapshots.append(snapshot)
+	return snapshots
+
+
+func care_for_pup(pup_id: int) -> bool:
+	var now: int = TimeManager.current_unix_time()
+	for index: int in range(nursery_pups.size()):
+		var pup: Dictionary = nursery_pups[index]
+		if _dictionary_int(pup, "id", 0) != pup_id:
+			continue
+		if _dictionary_int(pup, "ready_unix", now) <= now:
+			EventBus.toast_requested.emit("성장이 끝났습니다. 성체로 합류시켜 주세요.")
+			return false
+		var care_count: int = _dictionary_int(pup, "care_count", 0)
+		if care_count >= NURSERY_MAX_CARE:
+			EventBus.toast_requested.emit("이 새끼는 돌봄을 모두 받았습니다.")
+			return false
+		pup["ready_unix"] = maxi(
+			now,
+			_dictionary_int(pup, "ready_unix", now) - NURSERY_CARE_REDUCTION_SECONDS
+		)
+		pup["care_count"] = care_count + 1
+		nursery_pups[index] = pup
+		EventBus.toast_requested.emit(
+			"돌봄 완료 · 성장 %d초 단축" % NURSERY_CARE_REDUCTION_SECONDS
+		)
+		EventBus.game_state_changed.emit()
+		save_now()
+		return true
+	EventBus.toast_requested.emit("해당 새끼를 찾지 못했습니다.")
+	return false
+
+
+func claim_grown_pup(pup_id: int) -> bool:
+	var now: int = TimeManager.current_unix_time()
+	for index: int in range(nursery_pups.size()):
+		var pup: Dictionary = nursery_pups[index]
+		if _dictionary_int(pup, "id", 0) != pup_id:
+			continue
+		if _dictionary_int(pup, "ready_unix", now + 1) > now:
+			EventBus.toast_requested.emit("아직 성장 중입니다.")
+			return false
+		nursery_pups.remove_at(index)
+		total_raised_pups += 1
+		mouse_count += 1
+		EventBus.mouse_count_changed.emit(mouse_count)
+		EventBus.toast_requested.emit("보육실에서 자란 새 쥐가 군락에 합류했습니다!")
+		EventBus.game_state_changed.emit()
+		save_now()
+		return true
+	EventBus.toast_requested.emit("합류할 새끼를 찾지 못했습니다.")
+	return false
 
 
 func activate_click_boost() -> void:
@@ -737,6 +865,10 @@ func _default_save_data() -> Dictionary:
 		"completed_field_action_ids": [],
 		"next_field_action_unix": 0,
 		"region_progress": {},
+		"nursery_level": 0,
+		"nursery_pups": [],
+		"total_raised_pups": 0,
+		"next_pup_id": 1,
 		"tutorial_step": 0,
 		"play_time_seconds": 0.0,
 		"total_trips": 0,
@@ -780,6 +912,35 @@ func _apply_save_data(data: Dictionary) -> void:
 		_dictionary_int(data, "next_field_action_unix", 0)
 	)
 	region_progress = _dictionary_dictionary(data, "region_progress").duplicate(true)
+	nursery_level = clampi(_dictionary_int(data, "nursery_level", 0), 0, 1)
+	nursery_pups.clear()
+	var pups_value: Variant = data.get("nursery_pups", [])
+	if pups_value is Array:
+		@warning_ignore("unsafe_cast")
+		var loaded_pups: Array = pups_value as Array
+		for pup_value: Variant in loaded_pups:
+			if pup_value is Dictionary:
+				@warning_ignore("unsafe_cast")
+				var pup: Dictionary = (pup_value as Dictionary).duplicate(true)
+				var pup_id: int = _dictionary_int(pup, "id", 0)
+				var ready_unix: int = _dictionary_int(pup, "ready_unix", 0)
+				if pup_id > 0 and ready_unix > 0:
+					pup["id"] = pup_id
+					pup["ready_unix"] = ready_unix
+					pup["care_count"] = clampi(
+						_dictionary_int(pup, "care_count", 0),
+						0,
+						NURSERY_MAX_CARE
+					)
+					nursery_pups.append(pup)
+	if nursery_level <= 0:
+		nursery_pups.clear()
+	elif nursery_pups.size() > get_nursery_capacity():
+		nursery_pups.resize(get_nursery_capacity())
+	total_raised_pups = maxi(0, _dictionary_int(data, "total_raised_pups", 0))
+	next_pup_id = maxi(1, _dictionary_int(data, "next_pup_id", 1))
+	for pup: Dictionary in nursery_pups:
+		next_pup_id = maxi(next_pup_id, _dictionary_int(pup, "id", 0) + 1)
 	tutorial_step = clampi(_dictionary_int(data, "tutorial_step", 0), 0, 4)
 	play_time_seconds = maxf(0.0, _dictionary_float(data, "play_time_seconds", 0.0))
 	total_trips = maxi(0, _dictionary_int(data, "total_trips", 0))
@@ -804,6 +965,10 @@ func _build_save_data() -> Dictionary:
 		"completed_field_action_ids": completed_field_action_ids.duplicate(),
 		"next_field_action_unix": next_field_action_unix,
 		"region_progress": region_progress.duplicate(true),
+		"nursery_level": nursery_level,
+		"nursery_pups": nursery_pups.duplicate(true),
+		"total_raised_pups": total_raised_pups,
+		"next_pup_id": next_pup_id,
 		"tutorial_step": tutorial_step,
 		"play_time_seconds": play_time_seconds,
 		"total_trips": total_trips,

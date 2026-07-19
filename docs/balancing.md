@@ -24,6 +24,11 @@
 | 자동 저장 | 3초 | `AUTO_SAVE_INTERVAL` |
 | 오프라인 상한 | 4시간 | `TimeManager` |
 | 예상 편도 거리 | 760 px | `ESTIMATED_ONE_WAY_DISTANCE` |
+| 보육실 해금 | 쥐구멍 Lv.10 | `NURSERY_UNLOCK_HOLE_LEVEL` |
+| 보육실 건설 비용 | 500 | `NURSERY_BUILD_COST` |
+| 새끼 등록 시작 비용 | 200, 완료마다 1.5배 | `get_nursery_pup_cost()` |
+| 새끼 성장 | 120초 | `NURSERY_GROWTH_SECONDS` |
+| 돌봄 | 최대 3회, 회당 15초 단축 | `NURSERY_*CARE*` |
 
 강화 비용 공식:
 

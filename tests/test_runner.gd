@@ -23,6 +23,8 @@ func _run_tests() -> void:
 	_test_field_action_data()
 	_test_field_action_resolution()
 	_test_dot_action_input()
+	_test_nursery_lifecycle()
+	_test_nursery_view_input()
 	_test_reward_text_bounds()
 	_test_stage_backgrounds()
 	_test_stage_choice_events()
@@ -35,10 +37,10 @@ func _run_tests() -> void:
 	await _test_mouse_round_trip()
 
 	if _failures == 0:
-		print("JJUGUMEONG V0.3 tests: PASS")
+		print("JJUGUMEONG V0.4 tests: PASS")
 		get_tree().quit(0)
 	else:
-		push_error("JJUGUMEONG V0.3 tests: %d failure(s)" % _failures)
+		push_error("JJUGUMEONG V0.4 tests: %d failure(s)" % _failures)
 		get_tree().quit(1)
 
 
@@ -51,9 +53,9 @@ func _test_time_cap() -> void:
 func _test_build_info() -> void:
 	_expect_true(GameManager.display_name == "쥐구멍", "build display name")
 	_expect_true(GameManager.product_name == "r4", "build product name")
-	_expect_true(GameManager.build_version == "0.3.3", "build version")
-	_expect_true(GameManager.build_phase == "V0.3 Alpha", "build phase")
-	_expect_true(GameManager.get_build_label() == "r4 0.3.3", "build label")
+	_expect_true(GameManager.build_version == "0.4.0", "build version")
+	_expect_true(GameManager.build_phase == "V0.4 Alpha", "build phase")
+	_expect_true(GameManager.get_build_label() == "r4 0.4.0", "build label")
 
 
 func _test_save_schema_migration() -> void:
@@ -73,7 +75,11 @@ func _test_save_schema_migration() -> void:
 		"next_region_event_unix": 0,
 		"completed_field_action_ids": [],
 		"next_field_action_unix": 0,
-		"region_progress": {}
+		"region_progress": {},
+		"nursery_level": 0,
+		"nursery_pups": [],
+		"total_raised_pups": 0,
+		"next_pup_id": 1
 	}
 	var migrated_value: Variant = SaveManager.call("_migrate_data", legacy, defaults)
 	_expect_true(migrated_value is Dictionary, "schema 1 migration result type")
@@ -82,7 +88,7 @@ func _test_save_schema_migration() -> void:
 		var migrated: Dictionary = migrated_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(migrated, "schema_version", 0),
-			4,
+			5,
 			"schema migration version"
 		)
 		_expect_equal_int(
@@ -95,6 +101,11 @@ func _test_save_schema_migration() -> void:
 			_dictionary_array_size(migrated, "completed_field_action_ids"),
 			0,
 			"schema migration field actions"
+		)
+		_expect_equal_int(
+			_dictionary_array_size(migrated, "nursery_pups"),
+			0,
+			"schema migration nursery pups"
 		)
 	var schema_two: Dictionary = {
 		"schema_version": 2,
@@ -112,7 +123,7 @@ func _test_save_schema_migration() -> void:
 		var schema_two_migrated: Dictionary = schema_two_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(schema_two_migrated, "schema_version", 0),
-			4,
+			5,
 			"schema 2 migration version"
 		)
 		_expect_equal_int(
@@ -125,6 +136,125 @@ func _test_save_schema_migration() -> void:
 			0,
 			"schema 2 field actions initialized"
 		)
+	var schema_four: Dictionary = {
+		"schema_version": 4,
+		"region_progress": {
+			"old_kitchen": {
+				"action_level": 2,
+				"risk_level": 1
+			}
+		}
+	}
+	var schema_four_value: Variant = SaveManager.call(
+		"_migrate_data",
+		schema_four,
+		defaults
+	)
+	_expect_true(schema_four_value is Dictionary, "schema 4 migration result type")
+	if schema_four_value is Dictionary:
+		@warning_ignore("unsafe_cast")
+		var schema_four_migrated: Dictionary = schema_four_value as Dictionary
+		_expect_equal_int(
+			_dictionary_int(schema_four_migrated, "schema_version", 0),
+			5,
+			"schema 4 migration version"
+		)
+		_expect_equal_int(
+			_dictionary_array_size(schema_four_migrated, "nursery_pups"),
+			0,
+			"schema 4 nursery pups initialized"
+		)
+		_expect_equal_int(
+			_dictionary_int(schema_four_migrated, "next_pup_id", 0),
+			1,
+			"schema 4 next pup id initialized"
+		)
+
+
+func _test_nursery_lifecycle() -> void:
+	var previous_cheese: float = GameManager.cheese
+	var previous_mouse_count: int = GameManager.mouse_count
+	var previous_hole_level: int = GameManager.hole_level
+	var previous_nursery_level: int = GameManager.nursery_level
+	var previous_pups: Array[Dictionary] = GameManager.nursery_pups.duplicate(true)
+	var previous_total_raised: int = GameManager.total_raised_pups
+	var previous_next_pup_id: int = GameManager.next_pup_id
+
+	GameManager.cheese = 10_000.0
+	GameManager.hole_level = 9
+	GameManager.nursery_level = 0
+	GameManager.nursery_pups.clear()
+	GameManager.total_raised_pups = 0
+	GameManager.next_pup_id = 1
+	_expect_true(not GameManager.build_nursery(), "nursery locked before hole level 10")
+	GameManager.hole_level = 10
+	var before_build_cheese: float = GameManager.cheese
+	_expect_true(GameManager.build_nursery(), "nursery builds at hole level 10")
+	_expect_equal_float(
+		GameManager.cheese,
+		before_build_cheese - 500.0,
+		"nursery build cost"
+	)
+	_expect_true(GameManager.start_nursery_pup(), "nursery starts first pup")
+	_expect_true(GameManager.start_nursery_pup(), "nursery starts second pup")
+	_expect_true(not GameManager.start_nursery_pup(), "nursery capacity enforced")
+	var first_id: int = _dictionary_int(GameManager.nursery_pups[0], "id", 0)
+	var ready_before: int = _dictionary_int(
+		GameManager.nursery_pups[0],
+		"ready_unix",
+		0
+	)
+	_expect_true(GameManager.care_for_pup(first_id), "nursery care applies")
+	_expect_equal_int(
+		_dictionary_int(GameManager.nursery_pups[0], "ready_unix", 0),
+		ready_before - GameManager.NURSERY_CARE_REDUCTION_SECONDS,
+		"nursery care time reduction"
+	)
+	_expect_true(GameManager.care_for_pup(first_id), "nursery second care")
+	_expect_true(GameManager.care_for_pup(first_id), "nursery third care")
+	_expect_true(not GameManager.care_for_pup(first_id), "nursery care maximum")
+	_expect_true(not GameManager.claim_grown_pup(first_id), "nursery blocks early claim")
+	GameManager.nursery_pups[0]["ready_unix"] = TimeManager.current_unix_time()
+	var before_claim_mouse_count: int = GameManager.mouse_count
+	_expect_true(GameManager.claim_grown_pup(first_id), "nursery grown pup joins")
+	_expect_equal_int(
+		GameManager.mouse_count,
+		before_claim_mouse_count + 1,
+		"nursery adult increases mouse count"
+	)
+	_expect_equal_int(GameManager.total_raised_pups, 1, "nursery raised total")
+	_expect_equal_int(GameManager.nursery_pups.size(), 1, "nursery slot clears")
+
+	GameManager.cheese = previous_cheese
+	GameManager.mouse_count = previous_mouse_count
+	GameManager.hole_level = previous_hole_level
+	GameManager.nursery_level = previous_nursery_level
+	GameManager.nursery_pups = previous_pups
+	GameManager.total_raised_pups = previous_total_raised
+	GameManager.next_pup_id = previous_next_pup_id
+
+
+func _test_nursery_view_input() -> void:
+	var nursery: NurseryView = NurseryView.new()
+	nursery.size = Vector2(500.0, 250.0)
+	var snapshots: Array[Dictionary] = [{
+		"id": 7,
+		"remaining_seconds": 60,
+		"ready": false,
+		"care_count": 0
+	}]
+	nursery.set_pups(snapshots)
+	_expect_equal_int(
+		nursery.submit_point(Vector2(-100.0, -100.0)),
+		0,
+		"nursery ignores distant input"
+	)
+	_expect_equal_int(
+		nursery.submit_point(nursery.get_pup_position(0)),
+		7,
+		"nursery pup point input"
+	)
+	nursery.free()
 
 
 func _test_upgrade_costs() -> void:
@@ -180,10 +310,12 @@ func _test_visual_progression() -> void:
 
 
 func _test_golden_reward() -> void:
+	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
 	GameManager.cheese = 0.0
 	GameManager.total_cheese = 0.0
 	GameManager.carry_level = 0
 	GameManager.current_stage_index = 0
+	GameManager.region_progress = {}
 	GameManager.highest_unlocked_stage_index = 0
 	GameManager.golden_remaining = 0.0
 	var normal_reward: int = GameManager.collect_trip(1)
@@ -195,6 +327,7 @@ func _test_golden_reward() -> void:
 	_expect_equal_int(reward, 125, "alpha and golden cheese multipliers")
 	_expect_equal_float(GameManager.cheese, 125.0, "golden cheese balance")
 	GameManager.golden_remaining = 0.0
+	GameManager.region_progress = previous_region_progress
 
 
 func _test_colony_progression() -> void:
@@ -799,6 +932,14 @@ func _test_save_round_trip() -> void:
 				"last_choice_id": "kitchen_cat_patrol_0"
 			}
 		},
+		"nursery_level": 1,
+		"nursery_pups": [{
+			"id": 4,
+			"ready_unix": TimeManager.current_unix_time() + 60,
+			"care_count": 2
+		}],
+		"total_raised_pups": 3,
+		"next_pup_id": 5,
 		"tutorial_step": 4,
 		"play_time_seconds": 99.0,
 		"total_trips": 12,
@@ -816,6 +957,11 @@ func _test_save_round_trip() -> void:
 		_expect_equal_float(loaded_cheese, 321.0, "save/load cheese")
 	else:
 		_fail("save/load cheese type")
+	_expect_equal_int(
+		_dictionary_array_size(loaded, "nursery_pups"),
+		1,
+		"save/load nursery pups"
+	)
 
 
 func _test_ui_layout() -> void:
@@ -909,6 +1055,28 @@ func _test_ui_layout() -> void:
 		"portrait field action mechanic"
 	)
 	game_ui.call("_hide_field_action")
+	var previous_hole_level: int = GameManager.hole_level
+	var previous_nursery_level: int = GameManager.nursery_level
+	var previous_pups: Array[Dictionary] = GameManager.nursery_pups.duplicate(true)
+	GameManager.hole_level = 10
+	GameManager.nursery_level = 1
+	GameManager.nursery_pups = [{
+		"id": 99,
+		"ready_unix": TimeManager.current_unix_time() + 60,
+		"care_count": 0
+	}]
+	game_ui.call("_show_nursery")
+	await get_tree().process_frame
+	_expect_true(game_ui.nursery_panel.visible, "portrait nursery opens")
+	_expect_true(
+		game_ui.nursery_panel.get_global_rect().end.y <= host.size.y,
+		"portrait nursery bottom bound"
+	)
+	_expect_equal_int(game_ui.nursery_view.pups.size(), 1, "nursery view receives pup")
+	game_ui.call("_hide_nursery")
+	GameManager.hole_level = previous_hole_level
+	GameManager.nursery_level = previous_nursery_level
+	GameManager.nursery_pups = previous_pups
 	GameManager.current_stage_index = previous_stage_index
 	GameManager.next_field_action_unix = previous_field_cooldown
 	GameManager.next_region_event_unix = previous_cooldown
