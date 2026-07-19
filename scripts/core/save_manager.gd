@@ -6,7 +6,7 @@ const TEMP_PATH: String = "user://savegame.tmp.json"
 const WEB_STORAGE_KEY: String = "jjugumeong.save.v1"
 const WEB_COOKIE_KEY: String = "jjugumeong_save"
 const WEB_COOKIE_MAX_SIZE: int = 2500
-const CURRENT_SCHEMA_VERSION: int = 5
+const CURRENT_SCHEMA_VERSION: int = 6
 
 var last_load_used_backup: bool = false
 var last_load_was_recovered: bool = false
@@ -219,6 +219,12 @@ func _migrate_data(data: Dictionary, default_data: Dictionary) -> Dictionary:
 		result["nursery_pups"] = []
 		result["total_raised_pups"] = 0
 		result["next_pup_id"] = 1
+	if schema_version < 6:
+		result["role_assignments"] = {
+			"gatherer": maxi(1, _dictionary_int(data, "mouse_count", 1)),
+			"explorer": 0,
+			"builder": 0
+		}
 	result["schema_version"] = CURRENT_SCHEMA_VERSION
 	return result
 

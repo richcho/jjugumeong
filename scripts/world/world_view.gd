@@ -53,7 +53,7 @@ func _ready() -> void:
 	EventBus.stage_changed.connect(_on_stage_changed)
 	EventBus.golden_cheese_changed.connect(_on_golden_cheese_changed)
 	_update_layout()
-	_rebuild_mice(GameManager.mouse_count)
+	_rebuild_mice(GameManager.get_gatherer_count())
 	_on_stage_changed(GameManager.current_stage_index)
 
 
@@ -296,8 +296,8 @@ func _on_reward_delivered(world_position_value: Vector2, amount: int) -> void:
 	})
 
 
-func _on_mouse_count_changed(count: int) -> void:
-	_rebuild_mice(count)
+func _on_mouse_count_changed(_count: int) -> void:
+	_rebuild_mice(GameManager.get_gatherer_count())
 
 
 func _on_stage_changed(_stage_index: int) -> void:

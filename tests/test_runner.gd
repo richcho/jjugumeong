@@ -25,6 +25,8 @@ func _run_tests() -> void:
 	_test_dot_action_input()
 	_test_nursery_lifecycle()
 	_test_nursery_view_input()
+	_test_role_assignment()
+	_test_role_board_input()
 	_test_reward_text_bounds()
 	_test_stage_backgrounds()
 	_test_stage_choice_events()
@@ -37,10 +39,10 @@ func _run_tests() -> void:
 	await _test_mouse_round_trip()
 
 	if _failures == 0:
-		print("JJUGUMEONG V0.4 tests: PASS")
+		print("JJUGUMEONG V0.4.1 tests: PASS")
 		get_tree().quit(0)
 	else:
-		push_error("JJUGUMEONG V0.4 tests: %d failure(s)" % _failures)
+		push_error("JJUGUMEONG V0.4.1 tests: %d failure(s)" % _failures)
 		get_tree().quit(1)
 
 
@@ -53,9 +55,9 @@ func _test_time_cap() -> void:
 func _test_build_info() -> void:
 	_expect_true(GameManager.display_name == "쥐구멍", "build display name")
 	_expect_true(GameManager.product_name == "r4", "build product name")
-	_expect_true(GameManager.build_version == "0.4.0", "build version")
+	_expect_true(GameManager.build_version == "0.4.1", "build version")
 	_expect_true(GameManager.build_phase == "V0.4 Alpha", "build phase")
-	_expect_true(GameManager.get_build_label() == "r4 0.4.0", "build label")
+	_expect_true(GameManager.get_build_label() == "r4 0.4.1", "build label")
 
 
 func _test_save_schema_migration() -> void:
@@ -79,7 +81,12 @@ func _test_save_schema_migration() -> void:
 		"nursery_level": 0,
 		"nursery_pups": [],
 		"total_raised_pups": 0,
-		"next_pup_id": 1
+		"next_pup_id": 1,
+		"role_assignments": {
+			"gatherer": 1,
+			"explorer": 0,
+			"builder": 0
+		}
 	}
 	var migrated_value: Variant = SaveManager.call("_migrate_data", legacy, defaults)
 	_expect_true(migrated_value is Dictionary, "schema 1 migration result type")
@@ -88,7 +95,7 @@ func _test_save_schema_migration() -> void:
 		var migrated: Dictionary = migrated_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(migrated, "schema_version", 0),
-			5,
+			6,
 			"schema migration version"
 		)
 		_expect_equal_int(
@@ -123,7 +130,7 @@ func _test_save_schema_migration() -> void:
 		var schema_two_migrated: Dictionary = schema_two_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(schema_two_migrated, "schema_version", 0),
-			5,
+			6,
 			"schema 2 migration version"
 		)
 		_expect_equal_int(
@@ -156,7 +163,7 @@ func _test_save_schema_migration() -> void:
 		var schema_four_migrated: Dictionary = schema_four_value as Dictionary
 		_expect_equal_int(
 			_dictionary_int(schema_four_migrated, "schema_version", 0),
-			5,
+			6,
 			"schema 4 migration version"
 		)
 		_expect_equal_int(
@@ -169,6 +176,30 @@ func _test_save_schema_migration() -> void:
 			1,
 			"schema 4 next pup id initialized"
 		)
+	var schema_five: Dictionary = {
+		"schema_version": 5,
+		"mouse_count": 4,
+		"nursery_level": 1,
+		"nursery_pups": []
+	}
+	var schema_five_value: Variant = SaveManager.call(
+		"_migrate_data",
+		schema_five,
+		defaults
+	)
+	_expect_true(schema_five_value is Dictionary, "schema 5 migration result type")
+	if schema_five_value is Dictionary:
+		@warning_ignore("unsafe_cast")
+		var schema_five_migrated: Dictionary = schema_five_value as Dictionary
+		var roles: Dictionary = _dictionary_dictionary(
+			schema_five_migrated,
+			"role_assignments"
+		)
+		_expect_equal_int(
+			_dictionary_int(roles, "gatherer", 0),
+			4,
+			"schema 5 mice migrate to gatherers"
+		)
 
 
 func _test_nursery_lifecycle() -> void:
@@ -179,6 +210,7 @@ func _test_nursery_lifecycle() -> void:
 	var previous_pups: Array[Dictionary] = GameManager.nursery_pups.duplicate(true)
 	var previous_total_raised: int = GameManager.total_raised_pups
 	var previous_next_pup_id: int = GameManager.next_pup_id
+	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
 
 	GameManager.cheese = 10_000.0
 	GameManager.hole_level = 9
@@ -186,6 +218,11 @@ func _test_nursery_lifecycle() -> void:
 	GameManager.nursery_pups.clear()
 	GameManager.total_raised_pups = 0
 	GameManager.next_pup_id = 1
+	GameManager.role_assignments = {
+		"gatherer": GameManager.mouse_count,
+		"explorer": 0,
+		"builder": 0
+	}
 	_expect_true(not GameManager.build_nursery(), "nursery locked before hole level 10")
 	GameManager.hole_level = 10
 	var before_build_cheese: float = GameManager.cheese
@@ -232,6 +269,7 @@ func _test_nursery_lifecycle() -> void:
 	GameManager.nursery_pups = previous_pups
 	GameManager.total_raised_pups = previous_total_raised
 	GameManager.next_pup_id = previous_next_pup_id
+	GameManager.role_assignments = previous_roles
 
 
 func _test_nursery_view_input() -> void:
@@ -255,6 +293,105 @@ func _test_nursery_view_input() -> void:
 		"nursery pup point input"
 	)
 	nursery.free()
+
+
+func _test_role_assignment() -> void:
+	var previous_mouse_count: int = GameManager.mouse_count
+	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
+	var previous_stage_index: int = GameManager.current_stage_index
+	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
+	var previous_golden: float = GameManager.golden_remaining
+	var previous_cheese: float = GameManager.cheese
+	var previous_nursery_level: int = GameManager.nursery_level
+	var previous_pups: Array[Dictionary] = GameManager.nursery_pups.duplicate(true)
+	var previous_next_pup_id: int = GameManager.next_pup_id
+	GameManager.mouse_count = 2
+	GameManager.role_assignments = {
+		"gatherer": 2,
+		"explorer": 0,
+		"builder": 0
+	}
+	_expect_true(not GameManager.assign_mouse_role("explorer"), "role board lock")
+	GameManager.mouse_count = 4
+	GameManager.role_assignments = {
+		"gatherer": 4,
+		"explorer": 0,
+		"builder": 0
+	}
+	GameManager.current_stage_index = 0
+	GameManager.region_progress = {}
+	GameManager.golden_remaining = 0.0
+	var base_production: float = GameManager.get_expected_per_second()
+	_expect_true(GameManager.assign_mouse_role("explorer"), "assign explorer")
+	_expect_equal_int(GameManager.get_role_count("gatherer"), 3, "explorer removes gatherer")
+	_expect_equal_float(
+		GameManager.get_explorer_reward_multiplier(),
+		1.1,
+		"explorer reward multiplier"
+	)
+	_expect_equal_float(
+		GameManager.get_expected_per_second(),
+		base_production * 0.75,
+		"role assignment changes production"
+	)
+	_expect_true(GameManager.assign_mouse_role("builder"), "assign builder")
+	_expect_equal_int(GameManager.get_nursery_growth_seconds(), 108, "builder growth time")
+	GameManager.cheese = 10_000.0
+	GameManager.nursery_level = 1
+	GameManager.nursery_pups.clear()
+	var growth_started_unix: int = TimeManager.current_unix_time()
+	_expect_true(GameManager.start_nursery_pup(), "builder starts nursery pup")
+	var assigned_ready_unix: int = _dictionary_int(
+		GameManager.nursery_pups[0],
+		"ready_unix",
+		0
+	)
+	_expect_true(
+		assigned_ready_unix - growth_started_unix >= 108
+		and assigned_ready_unix - growth_started_unix <= 109,
+		"builder bonus applies to new pup"
+	)
+	_expect_true(GameManager.assign_mouse_role("explorer"), "assign second explorer")
+	_expect_true(not GameManager.assign_mouse_role("builder"), "minimum gatherer protected")
+	_expect_true(GameManager.assign_mouse_role("gatherer"), "role returns to gatherer")
+	_expect_equal_int(GameManager.get_role_count("builder"), 0, "builder returns first")
+	_expect_true(GameManager.reset_mouse_roles(), "role reset")
+	_expect_equal_int(GameManager.get_role_count("gatherer"), 4, "all gather after reset")
+	_expect_equal_int(
+		GameManager.get_role_count("gatherer")
+		+ GameManager.get_role_count("explorer")
+		+ GameManager.get_role_count("builder"),
+		GameManager.mouse_count,
+		"role assignment sum"
+	)
+	GameManager.mouse_count = previous_mouse_count
+	GameManager.role_assignments = previous_roles
+	GameManager.current_stage_index = previous_stage_index
+	GameManager.region_progress = previous_region_progress
+	GameManager.golden_remaining = previous_golden
+	GameManager.cheese = previous_cheese
+	GameManager.nursery_level = previous_nursery_level
+	GameManager.nursery_pups = previous_pups
+	GameManager.next_pup_id = previous_next_pup_id
+
+
+func _test_role_board_input() -> void:
+	var role_board: RoleBoardView = RoleBoardView.new()
+	role_board.size = Vector2(500.0, 230.0)
+	role_board.set_assignments({
+		"gatherer": 2,
+		"explorer": 1,
+		"builder": 1
+	})
+	_expect_true(
+		role_board.submit_point(Vector2(-100.0, -100.0)).is_empty(),
+		"role board ignores distant input"
+	)
+	_expect_true(
+		role_board.submit_point(role_board.get_role_position("builder")) == "builder",
+		"role board builder point input"
+	)
+	role_board.free()
 
 
 func _test_upgrade_costs() -> void:
@@ -464,6 +601,7 @@ func _test_region_events() -> void:
 	var previous_cooldown: int = GameManager.next_region_event_unix
 	var previous_boost: float = GameManager.click_boost_remaining
 	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
+	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
 
 	GameManager.current_stage_index = 0
 	GameManager.highest_unlocked_stage_index = 0
@@ -474,6 +612,11 @@ func _test_region_events() -> void:
 	GameManager.golden_remaining = 0.0
 	GameManager.completed_region_event_ids.clear()
 	GameManager.next_region_event_unix = 0
+	GameManager.role_assignments = {
+		"gatherer": GameManager.mouse_count,
+		"explorer": 0,
+		"builder": 0
+	}
 	GameManager.region_progress["old_kitchen"] = {
 		"action_level": 0,
 		"risk_level": 2,
@@ -532,10 +675,27 @@ func _test_region_events() -> void:
 		0,
 		"repeat region event has no discovery bonus"
 	)
+	GameManager.next_region_event_unix = 0
+	GameManager.role_assignments = {
+		"gatherer": maxi(1, GameManager.mouse_count - 1),
+		"explorer": 1,
+		"builder": 0
+	}
+	var explorer_result: Dictionary = GameManager.resolve_region_event(0)
+	_expect_equal_int(
+		_dictionary_int(explorer_result, "reward", 0),
+		55,
+		"explorer increases region event reward"
+	)
 	GameManager.current_stage_index = 0
 	GameManager.highest_unlocked_stage_index = 0
 	GameManager.unlocked_stage_ids = ["old_kitchen"]
 	GameManager.next_region_event_unix = 0
+	GameManager.role_assignments = {
+		"gatherer": GameManager.mouse_count,
+		"explorer": 0,
+		"builder": 0
+	}
 	GameManager.region_progress["old_kitchen"] = {
 		"action_level": 3,
 		"risk_level": 1,
@@ -569,6 +729,7 @@ func _test_region_events() -> void:
 	GameManager.next_region_event_unix = previous_cooldown
 	GameManager.click_boost_remaining = previous_boost
 	GameManager.region_progress = previous_region_progress
+	GameManager.role_assignments = previous_roles
 
 
 func _test_field_action_data() -> void:
@@ -614,6 +775,7 @@ func _test_field_action_resolution() -> void:
 	var previous_completed: Array[String] = GameManager.completed_field_action_ids.duplicate()
 	var previous_cooldown: int = GameManager.next_field_action_unix
 	var previous_region_progress: Dictionary = GameManager.region_progress.duplicate(true)
+	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
 
 	GameManager.current_stage_index = 0
 	GameManager.highest_unlocked_stage_index = 0
@@ -624,6 +786,11 @@ func _test_field_action_resolution() -> void:
 	GameManager.golden_remaining = 0.0
 	GameManager.completed_field_action_ids.clear()
 	GameManager.next_field_action_unix = 0
+	GameManager.role_assignments = {
+		"gatherer": GameManager.mouse_count,
+		"explorer": 0,
+		"builder": 0
+	}
 	GameManager.region_progress["old_kitchen"] = {
 		"action_level": 0,
 		"risk_level": 2,
@@ -710,6 +877,7 @@ func _test_field_action_resolution() -> void:
 	GameManager.completed_field_action_ids = previous_completed
 	GameManager.next_field_action_unix = previous_cooldown
 	GameManager.region_progress = previous_region_progress
+	GameManager.role_assignments = previous_roles
 
 
 func _test_dot_action_input() -> void:
@@ -940,6 +1108,11 @@ func _test_save_round_trip() -> void:
 		}],
 		"total_raised_pups": 3,
 		"next_pup_id": 5,
+		"role_assignments": {
+			"gatherer": 2,
+			"explorer": 1,
+			"builder": 1
+		},
 		"tutorial_step": 4,
 		"play_time_seconds": 99.0,
 		"total_trips": 12,
@@ -961,6 +1134,15 @@ func _test_save_round_trip() -> void:
 		_dictionary_array_size(loaded, "nursery_pups"),
 		1,
 		"save/load nursery pups"
+	)
+	_expect_equal_int(
+		_dictionary_int(
+			_dictionary_dictionary(loaded, "role_assignments"),
+			"explorer",
+			0
+		),
+		1,
+		"save/load role assignments"
 	)
 
 
@@ -1077,6 +1259,29 @@ func _test_ui_layout() -> void:
 	GameManager.hole_level = previous_hole_level
 	GameManager.nursery_level = previous_nursery_level
 	GameManager.nursery_pups = previous_pups
+	var previous_mouse_count: int = GameManager.mouse_count
+	var previous_roles: Dictionary = GameManager.role_assignments.duplicate(true)
+	GameManager.mouse_count = 4
+	GameManager.role_assignments = {
+		"gatherer": 2,
+		"explorer": 1,
+		"builder": 1
+	}
+	game_ui.call("_show_role_board")
+	await get_tree().process_frame
+	_expect_true(game_ui.role_panel.visible, "portrait role board opens")
+	_expect_true(
+		game_ui.role_panel.get_global_rect().end.y <= host.size.y,
+		"portrait role board bottom bound"
+	)
+	_expect_equal_int(
+		_dictionary_int(game_ui.role_view.assignments, "builder", 0),
+		1,
+		"role board receives assignments"
+	)
+	game_ui.call("_hide_role_board")
+	GameManager.mouse_count = previous_mouse_count
+	GameManager.role_assignments = previous_roles
 	GameManager.current_stage_index = previous_stage_index
 	GameManager.next_field_action_unix = previous_field_cooldown
 	GameManager.next_region_event_unix = previous_cooldown

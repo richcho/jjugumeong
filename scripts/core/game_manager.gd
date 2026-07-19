@@ -25,6 +25,9 @@ const NURSERY_GROWTH_SECONDS: int = 120
 const NURSERY_CARE_REDUCTION_SECONDS: int = 15
 const NURSERY_MAX_CARE: int = 3
 const NURSERY_LEVEL_ONE_CAPACITY: int = 2
+const ROLE_BOARD_UNLOCK_MOUSE_COUNT: int = 3
+const ROLE_BONUS_PER_MOUSE: float = 0.1
+const ROLE_BONUS_MAX_MICE: int = 3
 
 var cheese: float = 0.0
 var total_cheese: float = 0.0
@@ -44,6 +47,11 @@ var nursery_level: int = 0
 var nursery_pups: Array[Dictionary] = []
 var total_raised_pups: int = 0
 var next_pup_id: int = 1
+var role_assignments: Dictionary = {
+	"gatherer": 1,
+	"explorer": 0,
+	"builder": 0
+}
 var tutorial_step: int = 0
 var golden_remaining: float = 0.0
 var click_boost_remaining: float = 0.0
@@ -69,6 +77,7 @@ func _ready() -> void:
 	_load_stages()
 	var loaded_data: Dictionary = SaveManager.load_game(_default_save_data())
 	_apply_save_data(loaded_data)
+	_reconcile_role_assignments()
 	_reconcile_unlocked_stages()
 	_reconcile_region_progress()
 	_calculate_offline_reward()
@@ -114,8 +123,8 @@ func _notification(what: int) -> void:
 		save_now()
 
 
-func collect_trip(base_amount: int) -> int:
-	var final_reward: int = _calculate_trip_reward(base_amount)
+func collect_trip(base_amount: int, reward_multiplier: float = 1.0) -> int:
+	var final_reward: int = _calculate_trip_reward(base_amount, reward_multiplier)
 	cheese += float(final_reward)
 	total_cheese += float(final_reward)
 	total_trips += 1
@@ -151,6 +160,7 @@ func buy_mouse() -> bool:
 	if not _spend_cheese(cost):
 		return false
 	mouse_count += 1
+	_reconcile_role_assignments()
 	EventBus.mouse_count_changed.emit(mouse_count)
 	EventBus.toast_requested.emit("새로운 집쥐가 합류했습니다!")
 	EventBus.game_state_changed.emit()
@@ -214,7 +224,7 @@ func start_nursery_pup() -> bool:
 		return false
 	nursery_pups.append({
 		"id": next_pup_id,
-		"ready_unix": TimeManager.current_unix_time() + NURSERY_GROWTH_SECONDS,
+		"ready_unix": TimeManager.current_unix_time() + get_nursery_growth_seconds(),
 		"care_count": 0
 	})
 	next_pup_id += 1
@@ -277,6 +287,7 @@ func claim_grown_pup(pup_id: int) -> bool:
 		nursery_pups.remove_at(index)
 		total_raised_pups += 1
 		mouse_count += 1
+		_reconcile_role_assignments()
 		EventBus.mouse_count_changed.emit(mouse_count)
 		EventBus.toast_requested.emit("보육실에서 자란 새 쥐가 군락에 합류했습니다!")
 		EventBus.game_state_changed.emit()
@@ -284,6 +295,99 @@ func claim_grown_pup(pup_id: int) -> bool:
 		return true
 	EventBus.toast_requested.emit("합류할 새끼를 찾지 못했습니다.")
 	return false
+
+
+func is_role_board_unlocked() -> bool:
+	return mouse_count >= ROLE_BOARD_UNLOCK_MOUSE_COUNT
+
+
+func get_role_count(role_id: String) -> int:
+	return maxi(0, _dictionary_int(role_assignments, role_id, 0))
+
+
+func get_gatherer_count() -> int:
+	return maxi(1, get_role_count("gatherer"))
+
+
+func get_explorer_reward_multiplier() -> float:
+	var bonus_mice: int = mini(get_role_count("explorer"), ROLE_BONUS_MAX_MICE)
+	return 1.0 + float(bonus_mice) * ROLE_BONUS_PER_MOUSE
+
+
+func get_builder_growth_multiplier() -> float:
+	var bonus_mice: int = mini(get_role_count("builder"), ROLE_BONUS_MAX_MICE)
+	return 1.0 - float(bonus_mice) * ROLE_BONUS_PER_MOUSE
+
+
+func get_nursery_growth_seconds() -> int:
+	return maxi(
+		1,
+		roundi(float(NURSERY_GROWTH_SECONDS) * get_builder_growth_multiplier())
+	)
+
+
+func assign_mouse_role(role_id: String) -> bool:
+	_reconcile_role_assignments()
+	if not is_role_board_unlocked():
+		EventBus.toast_requested.emit(
+			"역할 보드는 쥐 %d마리부터 열립니다." % ROLE_BOARD_UNLOCK_MOUSE_COUNT
+		)
+		return false
+	if role_id == "gatherer":
+		if get_role_count("builder") > 0:
+			role_assignments["builder"] = get_role_count("builder") - 1
+		elif get_role_count("explorer") > 0:
+			role_assignments["explorer"] = get_role_count("explorer") - 1
+		else:
+			EventBus.toast_requested.emit("모든 쥐가 이미 채집 중입니다.")
+			return false
+		role_assignments["gatherer"] = get_role_count("gatherer") + 1
+	elif role_id == "explorer" or role_id == "builder":
+		if get_role_count("gatherer") <= 1:
+			EventBus.toast_requested.emit("채집쥐 한 마리는 군락에 남아야 합니다.")
+			return false
+		role_assignments["gatherer"] = get_role_count("gatherer") - 1
+		role_assignments[role_id] = get_role_count(role_id) + 1
+	else:
+		return false
+	EventBus.mouse_count_changed.emit(mouse_count)
+	EventBus.game_state_changed.emit()
+	save_now()
+	return true
+
+
+func reset_mouse_roles() -> bool:
+	_reconcile_role_assignments()
+	if get_role_count("explorer") <= 0 and get_role_count("builder") <= 0:
+		return false
+	role_assignments = {
+		"gatherer": mouse_count,
+		"explorer": 0,
+		"builder": 0
+	}
+	EventBus.mouse_count_changed.emit(mouse_count)
+	EventBus.game_state_changed.emit()
+	EventBus.toast_requested.emit("모든 쥐가 채집 역할로 복귀했습니다.")
+	save_now()
+	return true
+
+
+func _reconcile_role_assignments() -> void:
+	var explorer_count: int = clampi(
+		get_role_count("explorer"),
+		0,
+		maxi(0, mouse_count - 1)
+	)
+	var builder_count: int = clampi(
+		get_role_count("builder"),
+		0,
+		maxi(0, mouse_count - explorer_count - 1)
+	)
+	role_assignments = {
+		"gatherer": mouse_count - explorer_count - builder_count,
+		"explorer": explorer_count,
+		"builder": builder_count
+	}
 
 
 func activate_click_boost() -> void:
@@ -536,9 +640,14 @@ func resolve_region_event(choice_index: int) -> Dictionary:
 			_dictionary_int(region_event, "first_discovery_reward_trips", 0)
 		)
 		completed_region_event_ids.append(event_id)
-	var base_reward: int = _calculate_trip_reward(get_carry_capacity() * reward_trips)
+	var role_multiplier: float = get_explorer_reward_multiplier()
+	var base_reward: int = _calculate_trip_reward(
+		get_carry_capacity() * reward_trips,
+		role_multiplier
+	)
 	var reward: int = collect_trip(
-		get_carry_capacity() * (reward_trips + first_reward_trips)
+		get_carry_capacity() * (reward_trips + first_reward_trips),
+		role_multiplier
 	)
 	var first_discovery_reward: int = maxi(0, reward - base_reward)
 	var choice_effect: String = _dictionary_string(choice, "effect", "secure")
@@ -626,9 +735,14 @@ func resolve_field_action(action_id: String, mistakes: int) -> Dictionary:
 	if not result_flag.is_empty() and not flags.has(result_flag):
 		flags.append(result_flag)
 	state["flags"] = flags
-	var base_reward: int = _calculate_trip_reward(get_carry_capacity() * reward_trips)
+	var role_multiplier: float = get_explorer_reward_multiplier()
+	var base_reward: int = _calculate_trip_reward(
+		get_carry_capacity() * reward_trips,
+		role_multiplier
+	)
 	var reward: int = collect_trip(
-		get_carry_capacity() * (reward_trips + first_reward_trips)
+		get_carry_capacity() * (reward_trips + first_reward_trips),
+		role_multiplier
 	)
 	region_progress[stage_id] = state
 	next_field_action_unix = (
@@ -750,7 +864,7 @@ func get_expected_per_second() -> float:
 	)
 	if golden_remaining > 0.0:
 		reward_per_trip *= GOLDEN_MULTIPLIER
-	return reward_per_trip * float(mouse_count) / maxf(round_trip_seconds, 0.1)
+	return reward_per_trip * float(get_gatherer_count()) / maxf(round_trip_seconds, 0.1)
 
 
 func get_speed_upgrade_cost() -> int:
@@ -795,11 +909,12 @@ func _scaled_cost(base_cost: int, purchased_levels: int) -> int:
 	return roundi(float(base_cost) * pow(1.5, float(purchased_levels)))
 
 
-func _calculate_trip_reward(base_amount: int) -> int:
+func _calculate_trip_reward(base_amount: int, reward_multiplier: float = 1.0) -> int:
 	var reward: float = (
 		float(base_amount)
 		* get_stage_bonus()
 		* ALPHA_TEST_REWARD_MULTIPLIER
+		* maxf(0.0, reward_multiplier)
 	)
 	if golden_remaining > 0.0:
 		reward *= GOLDEN_MULTIPLIER
@@ -869,6 +984,11 @@ func _default_save_data() -> Dictionary:
 		"nursery_pups": [],
 		"total_raised_pups": 0,
 		"next_pup_id": 1,
+		"role_assignments": {
+			"gatherer": 1,
+			"explorer": 0,
+			"builder": 0
+		},
 		"tutorial_step": 0,
 		"play_time_seconds": 0.0,
 		"total_trips": 0,
@@ -941,6 +1061,10 @@ func _apply_save_data(data: Dictionary) -> void:
 	next_pup_id = maxi(1, _dictionary_int(data, "next_pup_id", 1))
 	for pup: Dictionary in nursery_pups:
 		next_pup_id = maxi(next_pup_id, _dictionary_int(pup, "id", 0) + 1)
+	role_assignments = _dictionary_dictionary(
+		data,
+		"role_assignments"
+	).duplicate(true)
 	tutorial_step = clampi(_dictionary_int(data, "tutorial_step", 0), 0, 4)
 	play_time_seconds = maxf(0.0, _dictionary_float(data, "play_time_seconds", 0.0))
 	total_trips = maxi(0, _dictionary_int(data, "total_trips", 0))
@@ -969,6 +1093,7 @@ func _build_save_data() -> Dictionary:
 		"nursery_pups": nursery_pups.duplicate(true),
 		"total_raised_pups": total_raised_pups,
 		"next_pup_id": next_pup_id,
+		"role_assignments": role_assignments.duplicate(true),
 		"tutorial_step": tutorial_step,
 		"play_time_seconds": play_time_seconds,
 		"total_trips": total_trips,

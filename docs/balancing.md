@@ -29,6 +29,9 @@
 | 새끼 등록 시작 비용 | 200, 완료마다 1.5배 | `get_nursery_pup_cost()` |
 | 새끼 성장 | 120초 | `NURSERY_GROWTH_SECONDS` |
 | 돌봄 | 최대 3회, 회당 15초 단축 | `NURSERY_*CARE*` |
+| 역할 보드 해금 | 쥐 3마리 | `ROLE_BOARD_UNLOCK_MOUSE_COUNT` |
+| 탐험쥐 보너스 | 1마리당 지역 활동 보상 +10%, 최대 +30% | `ROLE_BONUS_*` |
+| 건설쥐 보너스 | 1마리당 새 새끼 성장 -10%, 최대 -30% | `ROLE_BONUS_*` |
 
 강화 비용 공식:
 

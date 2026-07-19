@@ -55,6 +55,11 @@ var nursery_view: NurseryView
 var nursery_primary_button: Button
 var nursery_claim_button: Button
 var nursery_button: Button
+var role_panel: PanelContainer
+var role_summary: Label
+var role_view: RoleBoardView
+var role_reset_button: Button
+var role_button: Button
 
 var _toast_remaining: float = 0.0
 var _refresh_elapsed: float = 0.0
@@ -203,6 +208,8 @@ func _build_interface() -> void:
 	utility_row.add_child(field_action_button)
 	nursery_button = _make_utility_button("보육실", _show_nursery)
 	utility_row.add_child(nursery_button)
+	role_button = _make_utility_button("역할", _show_role_board)
+	utility_row.add_child(role_button)
 	utility_row.add_child(_make_utility_button("지금 저장", _save_manually))
 
 	toast_label = _make_label("", 20, Color("#fff4d4"))
@@ -222,6 +229,7 @@ func _build_interface() -> void:
 	_build_region_event_panel()
 	_build_field_action_panel()
 	_build_nursery_panel()
+	_build_role_panel()
 	_build_tutorial_panel()
 	_build_offline_panel()
 
@@ -424,6 +432,41 @@ func _build_nursery_panel() -> void:
 	content.add_child(_make_button("보육실 나가기", _hide_nursery, Color("#5d486f")))
 
 
+func _build_role_panel() -> void:
+	role_panel = PanelContainer.new()
+	role_panel.add_theme_stylebox_override(
+		"panel",
+		_make_panel_style(Color(0.035, 0.045, 0.07, 0.99), 16)
+	)
+	role_panel.hide()
+	add_child(role_panel)
+	var margin: MarginContainer = _make_margin(18)
+	role_panel.add_child(margin)
+	var content: VBoxContainer = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 9)
+	margin.add_child(content)
+	var heading: Label = _make_label("군락 역할 보드", 24, Color("#ffd969"))
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(heading)
+	role_summary = _make_label("", 14, Color("#e8edf7"))
+	role_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	role_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(role_summary)
+	role_view = RoleBoardView.new()
+	role_view.custom_minimum_size = Vector2(0.0, 230.0)
+	role_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	role_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	role_view.role_pressed.connect(_on_role_pressed)
+	content.add_child(role_view)
+	role_reset_button = _make_button(
+		"전체 채집 복귀",
+		_on_role_reset_pressed,
+		Color("#4d6478")
+	)
+	content.add_child(role_reset_button)
+	content.add_child(_make_button("역할 보드 닫기", _hide_role_board, Color("#5d486f")))
+
+
 func _build_tutorial_panel() -> void:
 	tutorial_panel = PanelContainer.new()
 	tutorial_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.07, 0.055, 0.09, 0.98), 16))
@@ -482,14 +525,11 @@ func _refresh_all() -> void:
 	stage_label.text = "지역  %s" % _dictionary_string(stage, "name", "낡은 부엌")
 	cheese_label.text = "치즈  %s" % _format_number(GameManager.cheese)
 	production_label.text = "예상 생산  %s/초" % _format_number(GameManager.get_expected_per_second())
-	var visible_groups: int = mini(GameManager.mouse_count, 3)
-	mouse_label.text = "쥐  %d · 활동조 %d · %s" % [
+	mouse_label.text = "쥐 %d · 채집 %d · 탐험 %d · 건설 %d" % [
 		GameManager.mouse_count,
-		visible_groups,
-		VisualProgression.equipment_summary(
-			GameManager.speed_level,
-			GameManager.carry_level
-		)
+		GameManager.get_role_count("gatherer"),
+		GameManager.get_role_count("explorer"),
+		GameManager.get_role_count("builder")
 	]
 	speed_button.text = "속도 Lv.%d  ·  치즈 %s" % [
 		GameManager.speed_level,
@@ -545,6 +585,13 @@ func _refresh_all() -> void:
 	)
 	if nursery_panel.visible:
 		_refresh_nursery_panel()
+	role_button.text = (
+		"역할 · %d마리" % GameManager.mouse_count
+		if GameManager.is_role_board_unlocked()
+		else "역할 · 쥐 %d" % GameManager.ROLE_BOARD_UNLOCK_MOUSE_COUNT
+	)
+	if role_panel.visible:
+		_refresh_role_panel()
 
 	var reward: Dictionary = GameManager.get_next_reward_summary()
 	var reward_current: float = _dictionary_float(reward, "current", 0.0)
@@ -608,6 +655,7 @@ func _update_responsive_layout() -> void:
 	_place_modal(region_event_panel, Vector2(560.0, 390.0))
 	_place_modal(field_action_panel, Vector2(620.0, 620.0))
 	_place_modal(nursery_panel, Vector2(600.0, 620.0))
+	_place_modal(role_panel, Vector2(600.0, 540.0))
 	_place_modal(tutorial_panel, Vector2(480.0, 280.0))
 	_place_modal(offline_panel, Vector2(480.0, 260.0))
 	_place_modal(discovery_panel, Vector2(520.0, 150.0))
@@ -721,6 +769,7 @@ func _show_stats() -> void:
 		+ "발견한 지역 사건: %d개\n"
 		+ "완료한 현장 행동: %d개\n"
 		+ "보육실 출신 성체: %d마리\n"
+		+ "역할 배치: 채집 %d · 탐험 %d · 건설 %d\n"
 		+ "현재 생산 보너스: %.2f배"
 	) % [
 		_format_number(GameManager.total_cheese),
@@ -731,6 +780,9 @@ func _show_stats() -> void:
 		GameManager.completed_region_event_ids.size(),
 		GameManager.completed_field_action_ids.size(),
 		GameManager.total_raised_pups,
+		GameManager.get_role_count("gatherer"),
+		GameManager.get_role_count("explorer"),
+		GameManager.get_role_count("builder"),
 		GameManager.get_stage_bonus()
 	]
 	stats_panel.show()
@@ -979,6 +1031,65 @@ func _first_ready_pup_id(snapshots: Array[Dictionary]) -> int:
 		if _dictionary_bool(snapshot, "ready", false):
 			return _dictionary_int(snapshot, "id", 0)
 	return 0
+
+
+func _show_role_board() -> void:
+	_refresh_role_panel()
+	role_panel.show()
+	role_panel.move_to_front()
+
+
+func _hide_role_board() -> void:
+	role_panel.hide()
+
+
+func _refresh_role_panel() -> void:
+	role_view.set_assignments(GameManager.role_assignments)
+	var unlocked: bool = GameManager.is_role_board_unlocked()
+	if not unlocked:
+		role_summary.text = (
+			"쥐 %d마리부터 역할 변경 가능 · 현재 %d마리\n"
+			+ "보육실에서 성체를 합류시키거나 동료를 늘려 주세요."
+		) % [
+			GameManager.ROLE_BOARD_UNLOCK_MOUSE_COUNT,
+			GameManager.mouse_count
+		]
+	else:
+		role_summary.text = (
+			"채집 %d · 실제 생산 담당\n"
+			+ "탐험 %d · 지역 보상 +%d%%\n"
+			+ "건설 %d · 다음 새끼 성장 %d초\n"
+			+ "왼쪽 채집 · 가운데 탐험 · 오른쪽 건설\n"
+			+ "전문 역할점을 누르면 이동 · 채집점을 누르면 복귀"
+		) % [
+			GameManager.get_role_count("gatherer"),
+			GameManager.get_role_count("explorer"),
+			roundi((GameManager.get_explorer_reward_multiplier() - 1.0) * 100.0),
+			GameManager.get_role_count("builder"),
+			GameManager.get_nursery_growth_seconds()
+		]
+	role_view.mouse_filter = (
+		Control.MOUSE_FILTER_STOP
+		if unlocked
+		else Control.MOUSE_FILTER_IGNORE
+	)
+	role_reset_button.disabled = (
+		not unlocked
+		or (
+			GameManager.get_role_count("explorer") <= 0
+			and GameManager.get_role_count("builder") <= 0
+		)
+	)
+
+
+func _on_role_pressed(role_id: String) -> void:
+	GameManager.assign_mouse_role(role_id)
+	_refresh_role_panel()
+
+
+func _on_role_reset_pressed() -> void:
+	GameManager.reset_mouse_roles()
+	_refresh_role_panel()
 
 
 func _on_field_action_status_changed(status_text: String) -> void:

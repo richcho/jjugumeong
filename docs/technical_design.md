@@ -59,7 +59,7 @@ GatheringMouse 귀환
 | 주 파일 | `user://savegame.json` |
 | 백업 | `user://savegame.backup.json` |
 | 임시 파일 | `user://savegame.tmp.json` |
-| 현재 스키마 | 5 |
+| 현재 스키마 | 6 |
 
 저장 순서:
 
@@ -104,6 +104,11 @@ Web에서는 `user://`의 IndexedDB 저장, `localStorage`, 소형 쿠키 백업
 저장합니다. 스키마 4 이하 저장은 미건설 보육실과 빈 새끼 목록으로 이관합니다.
 화면은 상태를 직접 바꾸지 않고 `GameManager`의 건설·등록·돌봄·합류 API만
 호출합니다.
+
+스키마 6은 `role_assignments`에 채집·탐험·건설 인구를 저장합니다. 스키마 5
+이하 저장의 기존 쥐는 모두 채집 역할로 이관합니다. 로드 시 역할 합계를 전체
+인구와 다시 맞추고 최소 채집쥐 1마리를 보장합니다. `WorldView`는 전체 인구가
+아닌 `GameManager.get_gatherer_count()`로 실제 채집조를 구성합니다.
 
 ## 5. 화면과 반응형 규칙
 
