@@ -11,18 +11,18 @@ const STAGE_BACKGROUNDS: Array[Texture2D] = [
 	preload("res://assets/background/stages/cheese_factory.jpg")
 ]
 const STAGE_HOLE_ANCHORS: Array[Vector2] = [
-	Vector2(205.0, 456.0),
-	Vector2(120.0, 500.0),
-	Vector2(205.0, 495.0),
-	Vector2(155.0, 495.0),
-	Vector2(215.0, 540.0)
+	Vector2(175.0, 400.0),
+	Vector2(110.0, 480.0),
+	Vector2(195.0, 440.0),
+	Vector2(145.0, 480.0),
+	Vector2(200.0, 500.0)
 ]
 const STAGE_RESOURCE_ANCHORS: Array[Vector2] = [
-	Vector2(1110.0, 470.0),
-	Vector2(1115.0, 475.0),
-	Vector2(1100.0, 490.0),
-	Vector2(1110.0, 485.0),
-	Vector2(1050.0, 545.0)
+	Vector2(1185.0, 335.0),
+	Vector2(1175.0, 375.0),
+	Vector2(1155.0, 445.0),
+	Vector2(1135.0, 425.0),
+	Vector2(1085.0, 415.0)
 ]
 static var STAGE_ROUTE_CONTROLS: Array[PackedVector2Array] = [
 	PackedVector2Array([Vector2(390.0, 470.0), Vector2(700.0, 430.0), Vector2(930.0, 455.0)]),
