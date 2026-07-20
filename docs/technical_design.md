@@ -232,3 +232,4 @@ git diff --check
 | 구현됨 | 다음 보상 계산 | `GameManager.get_next_reward_summary()` 상태 API 사용 |
 | 구현됨 | 지역 선택 저장 | 스키마 2의 `unlocked_stage_ids`와 현재 선택 지역 사용 |
 | 결정 대기 | 전체 한글 글꼴 크기 | 문구 증가 시 서브셋 재생성 또는 전체 폰트 전환 비교 |
+| 결정 대기 | 이동 목표지점 정확도 | 실제 버그 여부 확인 필요. 버그로 확인되면 별도 P0 수정 건으로 분리, 일반 정밀도 기준이면 §8 검증 기준에 품질 게이트로 추가 (`jjugumeong_master_plan.md` §12.2) |
